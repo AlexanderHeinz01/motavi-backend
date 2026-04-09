@@ -1,0 +1,48 @@
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel
+
+
+class BodyRegions(BaseModel):
+    lumbar: float
+    shoulder_l: float
+    shoulder_r: float
+    neck: float
+    knee_l: float
+    knee_r: float
+    forearm: float
+
+
+class MovementStats(BaseModel):
+    pct: float
+    minutes: float
+
+
+class TimelinePoint(BaseModel):
+    minute: int
+    reba: float
+
+
+class ActionItem(BaseModel):
+    priority: str  # "CRITICAL" | "MEDIUM"
+    region: str
+    text: str
+    reduction_pct: Optional[int] = None
+
+
+class AnalysisResult(BaseModel):
+    job_id: str
+    worker_id: Optional[str] = None
+    shift_duration_min: int
+    reba_score: float
+    reba_level: str  # "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH"
+    body_regions: BodyRegions
+    movements: Dict[str, MovementStats]
+    timeline: List[TimelinePoint]
+    action_items: List[ActionItem]
+
+
+class AnalysisStatusResponse(BaseModel):
+    status: str  # "processing" | "done" | "error"
+    result: Optional[AnalysisResult] = None
+    error: Optional[str] = None

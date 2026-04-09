@@ -1,0 +1,27 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -t
+      - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA
+      - .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - motavi-backend
+      - --image=europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA
+      - --region=europe-west3
+      - --platform=managed
+      - --allow-unauthenticated
+      - --set-secrets=GCP_SERVICE_ACCOUNT_KEY=GCP_SERVICE_ACCOUNT_KEY:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest
+
+images:
+  - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA
