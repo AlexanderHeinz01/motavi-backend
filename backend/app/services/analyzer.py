@@ -1,18 +1,435 @@
-"""MediaPipe REBA analysis pipeline (runs as FastAPI BackgroundTask).
+"""MediaPipe-based REBA analysis pipeline.
 
-Pipeline steps:
-1. Download raw video from GCS (uploads/{job_id}/video.mp4)
-2. Anonymize: detect person via MediaPipe Pose, fill head bbox
-   (top 38% of person height + 20 px padding) with opaque grey rect
-3. REBA scoring per frame using landmark angle calculations
-4. Aggregate results: timeline, movement classifications, body region
-   subscores, action items
-5. Write results/{job_id}/result.json to GCS
+Runs as a FastAPI BackgroundTask. Steps:
+  1. Download raw video from GCS  (uploads/{job_id}/video.mp4)
+  2. Per-frame: anonymise head region (MediaPipe Pose bbox, top 38 % of
+     person height + 20 px padding), write anonymised mp4 back to GCS
+  3. REBA subscore calculation per sampled frame (every 25 frames ≈ 1 s)
+  4. Aggregate timeline, movement classes, body-region scores, action items
+  5. Write results/{job_id}/result.json to GCS
 """
-# TODO: implement in Step 2
+import asyncio
+import json
+import logging
+import tempfile
+from pathlib import Path
 
+import cv2
+import mediapipe as mp
+import numpy as np
+
+from ..config import settings
+from . import gcs
+
+logger = logging.getLogger(__name__)
+
+_mp_pose = mp.solutions.pose
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Geometry helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _angle_at_vertex(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
+    """Angle in degrees at vertex *b* formed by rays b→a and b→c."""
+    ba = a - b
+    bc = c - b
+    denom = np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-8
+    return float(np.degrees(np.arccos(np.clip(np.dot(ba, bc) / denom, -1.0, 1.0))))
+
+
+def _pt(landmarks, idx: int, w: int, h: int) -> np.ndarray:
+    lm = landmarks[idx]
+    return np.array([lm.x * w, lm.y * h])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REBA subscore calculation
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _reba_subscores(landmarks, w: int, h: int) -> dict[str, float]:
+    """Return per-region REBA-style subscores (raw, not yet normalised to 1-10)."""
+    def pt(idx: int) -> np.ndarray:
+        return _pt(landmarks, idx, w, h)
+
+    l_shoulder, r_shoulder = pt(11), pt(12)
+    l_elbow,    r_elbow    = pt(13), pt(14)
+    l_wrist,    r_wrist    = pt(15), pt(16)
+    l_hip,      r_hip      = pt(23), pt(24)
+    l_knee,     r_knee     = pt(25), pt(26)
+    l_ankle,    r_ankle    = pt(27), pt(28)
+    nose                   = pt(0)
+
+    mid_shoulder = (l_shoulder + r_shoulder) / 2
+    mid_hip      = (l_hip      + r_hip)      / 2
+
+    # ── Trunk (lumbar) ────────────────────────────────────────────────────────
+    trunk_vec   = mid_hip - mid_shoulder
+    trunk_angle = float(np.degrees(
+        np.arctan2(abs(trunk_vec[0]), abs(trunk_vec[1]) + 1e-8)
+    ))
+    if   trunk_angle <  5:  lumbar = 1.0
+    elif trunk_angle < 20:  lumbar = 2.5
+    elif trunk_angle < 45:  lumbar = 5.5
+    else:                   lumbar = 8.0
+
+    # ── Neck ─────────────────────────────────────────────────────────────────
+    neck_vec   = nose - mid_shoulder
+    neck_angle = float(np.degrees(
+        np.arctan2(abs(neck_vec[0]), abs(neck_vec[1]) + 1e-8)
+    ))
+    if   neck_angle < 10:  neck = 1.0
+    elif neck_angle < 20:  neck = 3.0
+    else:                  neck = 6.5
+
+    # ── Shoulder / upper arm ─────────────────────────────────────────────────
+    l_arm_angle = _angle_at_vertex(mid_shoulder, l_shoulder, l_elbow)
+    r_arm_angle = _angle_at_vertex(mid_shoulder, r_shoulder, r_elbow)
+    arm_angle   = max(l_arm_angle, r_arm_angle)
+    if   arm_angle < 20:  shoulder = 1.5
+    elif arm_angle < 45:  shoulder = 3.0
+    elif arm_angle < 90:  shoulder = 5.5
+    else:                 shoulder = 8.0
+
+    # ── Forearm / lower arm ───────────────────────────────────────────────────
+    l_elbow_angle = _angle_at_vertex(l_shoulder, l_elbow, l_wrist)
+    r_elbow_angle = _angle_at_vertex(r_shoulder, r_elbow, r_wrist)
+    elbow_angle   = max(l_elbow_angle, r_elbow_angle)
+    forearm = 1.5 if 60 <= elbow_angle <= 100 else 4.5
+
+    # ── Knee ─────────────────────────────────────────────────────────────────
+    l_flex = 180 - _angle_at_vertex(l_hip, l_knee, l_ankle)
+    r_flex = 180 - _angle_at_vertex(r_hip, r_knee, r_ankle)
+    knee_flex = max(l_flex, r_flex)
+    if   knee_flex < 30:  knee = 1.0
+    elif knee_flex < 60:  knee = 3.5
+    else:                 knee = 6.5
+
+    return {
+        "lumbar":     lumbar,
+        "shoulder_l": shoulder * 0.90,
+        "shoulder_r": shoulder,
+        "neck":       neck,
+        "knee_l":     knee * 0.95,
+        "knee_r":     knee,
+        "forearm":    forearm,
+    }
+
+
+# Max possible values per region (for normalisation to 1-10 later)
+_REGION_MAX: dict[str, float] = {
+    "lumbar":     8.0,
+    "shoulder_l": 7.2,
+    "shoulder_r": 8.0,
+    "neck":       6.5,
+    "knee_l":     6.175,
+    "knee_r":     6.5,
+    "forearm":    4.5,
+}
+
+_REGION_WEIGHTS: dict[str, float] = {
+    "lumbar":     0.30,
+    "neck":       0.20,
+    "shoulder_l": 0.10,
+    "shoulder_r": 0.10,
+    "knee_l":     0.10,
+    "knee_r":     0.10,
+    "forearm":    0.10,
+}
+
+
+def _overall_reba(subscores: dict[str, float]) -> float:
+    """Weighted combination → overall REBA score on 1-10 scale."""
+    raw = sum(
+        _REGION_WEIGHTS[k] * subscores[k] / _REGION_MAX[k]
+        for k in _REGION_WEIGHTS
+    )
+    return round(1.0 + raw * 9.0, 2)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Frame-level anonymisation
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _anonymise_frame(frame: np.ndarray, pose_result) -> np.ndarray:
+    """Draw an opaque grey box over the head region (top 38 % + 20 px pad)."""
+    if not pose_result.pose_landmarks:
+        return frame
+
+    h, w = frame.shape[:2]
+    lm = pose_result.pose_landmarks.landmark
+
+    vis_y = [lm[i].y * h for i in range(33) if lm[i].visibility > 0.3]
+    vis_x = [lm[i].x * w for i in range(33) if lm[i].visibility > 0.3]
+    if not vis_y:
+        return frame
+
+    p_top    = min(vis_y)
+    p_bottom = max(vis_y)
+    p_left   = min(vis_x)
+    p_right  = max(vis_x)
+    p_height = p_bottom - p_top
+
+    PAD = 20
+    box_top    = max(0, int(p_top)                         - PAD)
+    box_bottom = min(h, int(p_top + 0.38 * p_height)      + PAD)
+    box_left   = max(0, int(p_left)                        - PAD)
+    box_right  = min(w, int(p_right)                       + PAD)
+
+    cv2.rectangle(frame, (box_left, box_top), (box_right, box_bottom), (80, 80, 80), -1)
+    return frame
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pipeline entry point
+# ─────────────────────────────────────────────────────────────────────────────
 
 async def run_pipeline(job_id: str) -> None:
-    """BackgroundTask entry point: anonymize video and run REBA analysis."""
-    # TODO: implement
-    raise NotImplementedError
+    """BackgroundTask: anonymise + REBA analysis; write result to GCS."""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _pipeline_sync, job_id)
+
+
+def _pipeline_sync(job_id: str) -> None:
+    logger.info("Pipeline start: %s", job_id)
+    try:
+        _run(job_id)
+    except Exception:
+        logger.exception("Pipeline failed: %s", job_id)
+        _write_error(job_id, "Analysis pipeline failed — see server logs.")
+
+
+def _run(job_id: str) -> None:
+    raw_path = f"{settings.UPLOAD_PREFIX}{job_id}/video.mp4"
+    video_bytes = gcs.download_bytes(raw_path)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "input.mp4"
+        anon_path  = Path(tmp) / "anon.mp4"
+        input_path.write_bytes(video_bytes)
+
+        cap     = cv2.VideoCapture(str(input_path))
+        fps     = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(str(anon_path), fourcc, fps, (frame_w, frame_h))
+
+        pose = _mp_pose.Pose(
+            static_image_mode=False,
+            model_complexity=1,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5,
+        )
+
+        sampled: list[dict] = []
+        frame_idx = 0
+        sample_interval = max(1, int(fps))  # ~1 sample per second
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            rgb     = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = pose.process(rgb)
+            frame   = _anonymise_frame(frame, results)
+            writer.write(frame)
+
+            if frame_idx % sample_interval == 0 and results.pose_landmarks:
+                lm      = results.pose_landmarks.landmark
+                scores  = _reba_subscores(lm, frame_w, frame_h)
+                overall = _overall_reba(scores)
+                minute  = int(frame_idx / fps / 60)
+
+                # Trunk angle (for movement classification)
+                mid_sh_x  = (lm[11].x + lm[12].x) / 2
+                mid_sh_y  = (lm[11].y + lm[12].y) / 2
+                mid_hip_x = (lm[23].x + lm[24].x) / 2
+                mid_hip_y = (lm[23].y + lm[24].y) / 2
+                tv        = np.array([mid_hip_x - mid_sh_x, mid_hip_y - mid_sh_y])
+                trunk_ang = float(np.degrees(
+                    np.arctan2(abs(tv[0]), abs(tv[1]) + 1e-8)
+                ))
+
+                # Overhead: wrist above shoulder in image (smaller y = higher)
+                overhead = (lm[15].y < lm[11].y) or (lm[16].y < lm[12].y)
+
+                sampled.append({
+                    "frame":         frame_idx,
+                    "minute":        minute,
+                    "reba":          overall,
+                    "region_scores": scores,
+                    "trunk_angle":   trunk_ang,
+                    "overhead":      overhead,
+                })
+
+            frame_idx += 1
+
+        cap.release()
+        writer.release()
+        pose.close()
+
+        # Push anonymised video to GCS
+        anon_bytes = anon_path.read_bytes()
+        gcs.upload_bytes(
+            f"{settings.UPLOAD_PREFIX}{job_id}/video_anon.mp4",
+            anon_bytes,
+            "video/mp4",
+        )
+
+    result = _aggregate(job_id, sampled, fps)
+    gcs.upload_bytes(
+        f"{settings.RESULTS_PREFIX}{job_id}/result.json",
+        json.dumps(result).encode(),
+        "application/json",
+    )
+    logger.info("Pipeline done: %s  REBA=%.1f", job_id, result["reba_score"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Aggregation
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _aggregate(job_id: str, sampled: list[dict], fps: float) -> dict:
+    if not sampled:
+        return _empty_result(job_id)
+
+    reba_vals = [f["reba"] for f in sampled]
+    avg_reba  = float(np.mean(reba_vals))
+
+    # Region averages
+    region_avgs: dict[str, float] = {}
+    for k in _REGION_MAX:
+        vals = [f["region_scores"][k] for f in sampled if k in f.get("region_scores", {})]
+        region_avgs[k] = float(np.mean(vals)) if vals else 1.0
+
+    # Movement classification
+    n = len(sampled)
+    n_bend     = sum(1 for f in sampled if f["trunk_angle"] > 20 and not f["overhead"])
+    n_overhead = sum(1 for f in sampled if f["overhead"])
+    n_neutral  = n - n_bend - n_overhead
+
+    total_secs  = len(sampled) * max(1, int(fps)) / fps
+    shift_min   = max(1, int(total_secs / 60))
+
+    bend_pct  = round(n_bend     / n * 100, 1)
+    over_pct  = round(n_overhead / n * 100, 1)
+    neut_pct  = round(max(0.0, 100 - bend_pct - over_pct), 1)
+
+    # Per-minute timeline
+    by_minute: dict[int, list[float]] = {}
+    for f in sampled:
+        by_minute.setdefault(f["minute"], []).append(f["reba"])
+    timeline = [
+        {"minute": m, "reba": round(float(np.mean(vs)), 2)}
+        for m, vs in sorted(by_minute.items())
+    ]
+
+    # REBA level
+    if   avg_reba <= 4: level = "LOW"
+    elif avg_reba <= 6: level = "MEDIUM"
+    elif avg_reba <= 8: level = "HIGH"
+    else:               level = "VERY_HIGH"
+
+    return {
+        "job_id":            job_id,
+        "shift_duration_min": shift_min,
+        "reba_score":        round(avg_reba, 2),
+        "reba_level":        level,
+        "body_regions":      region_avgs,
+        "movements": {
+            "bending":  {"pct": bend_pct, "minutes": round(shift_min * bend_pct / 100, 1)},
+            "overhead": {"pct": over_pct, "minutes": round(shift_min * over_pct / 100, 1)},
+            "neutral":  {"pct": neut_pct, "minutes": round(shift_min * neut_pct / 100, 1)},
+        },
+        "timeline":    timeline,
+        "action_items": _build_action_items(region_avgs, bend_pct, over_pct),
+    }
+
+
+def _build_action_items(regions: dict[str, float], bend_pct: float, over_pct: float) -> list[dict]:
+    items: list[dict] = []
+
+    lumbar = regions.get("lumbar", 0)
+    if lumbar > 5:
+        items.append({
+            "priority":      "CRITICAL",
+            "region":        "Lendenwirbel",
+            "text":          f"Erhöhter Rumpfbeuge-Anteil ({bend_pct:.0f} % der Schichtzeit). "
+                             "Arbeitshöhe auf Ellbogenniveau anpassen.",
+            "reduction_pct": 40,
+        })
+    elif lumbar > 3:
+        items.append({
+            "priority":      "MEDIUM",
+            "region":        "Lendenwirbel",
+            "text":          "Moderate Lendenbelastung. Regelmäßige Entlastungspausen empfohlen.",
+            "reduction_pct": 20,
+        })
+
+    neck = regions.get("neck", 0)
+    if neck > 4:
+        items.append({
+            "priority":      "CRITICAL",
+            "region":        "Nacken",
+            "text":          "Anhaltende Nackenbeugehaltung erkannt. Bildschirm- oder Materialhöhe prüfen.",
+            "reduction_pct": 35,
+        })
+    elif neck > 2:
+        items.append({
+            "priority":      "MEDIUM",
+            "region":        "Nacken",
+            "text":          "Nackenhaltung auffällig. Arbeitsoberfläche um 5–10 cm anheben.",
+            "reduction_pct": 15,
+        })
+
+    shoulder = max(regions.get("shoulder_l", 0), regions.get("shoulder_r", 0))
+    if over_pct > 15 or shoulder > 6:
+        items.append({
+            "priority":      "CRITICAL" if over_pct > 20 else "MEDIUM",
+            "region":        "Schulter",
+            "text":          f"Überkopfarbeit: {over_pct:.0f} % der Schichtzeit. "
+                             "Arbeitsmittel in Greifhöhe bringen.",
+            "reduction_pct": 50,
+        })
+
+    if regions.get("forearm", 0) > 3.5:
+        items.append({
+            "priority":      "MEDIUM",
+            "region":        "Unterarm",
+            "text":          "Ungünstige Unterarmhaltung erkannt. Stützvorrichtungen prüfen.",
+            "reduction_pct": 25,
+        })
+
+    items.sort(key=lambda x: 0 if x["priority"] == "CRITICAL" else 1)
+    return items
+
+
+def _empty_result(job_id: str) -> dict:
+    return {
+        "job_id":             job_id,
+        "shift_duration_min": 0,
+        "reba_score":         1.0,
+        "reba_level":         "LOW",
+        "body_regions":       {k: 1.0 for k in _REGION_MAX},
+        "movements": {
+            "bending":  {"pct": 0.0, "minutes": 0.0},
+            "overhead": {"pct": 0.0, "minutes": 0.0},
+            "neutral":  {"pct": 100.0, "minutes": 0.0},
+        },
+        "timeline":    [],
+        "action_items": [],
+    }
+
+
+def _write_error(job_id: str, msg: str) -> None:
+    try:
+        gcs.upload_bytes(
+            f"{settings.RESULTS_PREFIX}{job_id}/result.json",
+            json.dumps({"error": msg}).encode(),
+            "application/json",
+        )
+    except Exception:
+        logger.exception("Failed to write error result for %s", job_id)
