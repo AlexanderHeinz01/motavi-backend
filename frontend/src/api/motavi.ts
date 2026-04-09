@@ -1,5 +1,3 @@
-// TODO: implement in Step 3
-
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
 
 export interface UploadResponse {
@@ -32,14 +30,35 @@ export interface AnalysisStatus {
   error?: string
 }
 
-export async function uploadVideo(_file: File): Promise<UploadResponse> {
-  // TODO: implement
-  throw new Error('Not implemented')
+export function uploadVideoWithProgress(
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<UploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const form = new FormData()
+    form.append('file', file)
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      if (xhr.status === 202) {
+        resolve(JSON.parse(xhr.responseText) as UploadResponse)
+      } else {
+        reject(new Error(`Upload fehlgeschlagen: ${xhr.status} ${xhr.statusText}`))
+      }
+    }
+    xhr.onerror = () => reject(new Error('Netzwerkfehler beim Upload'))
+    xhr.open('POST', `${API_BASE}/api/v1/upload`)
+    xhr.send(form)
+  })
 }
 
-export async function getAnalysisStatus(_jobId: string): Promise<AnalysisStatus> {
-  // TODO: implement
-  throw new Error('Not implemented')
+export async function getAnalysisStatus(jobId: string): Promise<AnalysisStatus> {
+  const res = await fetch(`${API_BASE}/api/v1/analysis/${jobId}`)
+  if (!res.ok) throw new Error(`Statusabfrage fehlgeschlagen: ${res.status}`)
+  return res.json() as Promise<AnalysisStatus>
 }
 
 export function getReportPdfUrl(jobId: string): string {
