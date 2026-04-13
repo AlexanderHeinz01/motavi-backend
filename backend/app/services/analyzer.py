@@ -8,6 +8,10 @@ Runs as a FastAPI BackgroundTask. Steps:
   4. Aggregate timeline, movement classes, body-region scores, action items
   5. Write results/{job_id}/result.json to GCS
 """
+import os
+os.environ["DISPLAY"] = ""
+os.environ["MESA_GL_VERSION_OVERRIDE"] = "3.3"
+
 import asyncio
 import json
 import logging
