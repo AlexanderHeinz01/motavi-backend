@@ -15,6 +15,7 @@ os.environ["MESA_GL_VERSION_OVERRIDE"] = "3.3"
 import asyncio
 import json
 import logging
+import math
 import tempfile
 import urllib.request
 from pathlib import Path
@@ -172,22 +173,31 @@ def _overall_reba(subscores: dict[str, float]) -> float:
 # Movement classification (geometry-based, independent of REBA score)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _trunk_angle(lm) -> float:
+    """Trunk inclination in degrees (0 = upright, 90 = horizontal)."""
+    hx = (lm[11].x + lm[12].x) / 2
+    hy = (lm[11].y + lm[12].y) / 2
+    sx = (lm[23].x + lm[24].x) / 2
+    sy = (lm[23].y + lm[24].y) / 2
+    dx = hx - sx
+    dy = hy - sy
+    return math.degrees(math.atan2(abs(dx), abs(dy)))
+
+
 def _classify_movement(lm) -> str:
     """Classify movement using normalised landmark coordinates."""
-    y_wrist_r   = lm[16].y
-    y_wrist_l   = lm[15].y
-    y_shoulder_r = lm[12].y
-    y_shoulder_l = lm[11].y
-    y_hip_r     = lm[24].y
+    y_handgelenk_r = lm[16].y
+    y_handgelenk_l = lm[15].y
+    y_schulter_r   = lm[12].y
+    y_schulter_l   = lm[11].y
 
-    overhead = (y_wrist_r < y_shoulder_r - 0.05 or
-                y_wrist_l < y_shoulder_l - 0.05)
-    bending  = (y_shoulder_r < y_hip_r - 0.25 or
-                y_shoulder_l < y_hip_r - 0.25)
+    ueberkopf = (y_handgelenk_r < y_schulter_r - 0.05 or
+                 y_handgelenk_l < y_schulter_l - 0.05)
+    buecken   = _trunk_angle(lm) > 20
 
-    if overhead:
+    if ueberkopf:
         return "overhead"
-    elif bending:
+    elif buecken:
         return "bending"
     else:
         return "neutral"
@@ -292,13 +302,14 @@ def _run(job_id: str, meta: dict) -> None:
 
                 movement = _classify_movement(lm)
 
-                frame_nr = len(sampled) + 1  # 1-indexed sample count
-                if frame_nr <= 10:
+                frame_nr   = len(sampled) + 1  # 1-indexed sample count
+                frame_time = frame_nr / fps
+                if 15 <= frame_time <= 30:
                     print(
-                        f"Frame {frame_nr}: y_schulter_r={lm[12].y:.3f}, "
+                        f"Frame {frame_nr} ({frame_time:.1f}s): "
+                        f"trunk_angle={_trunk_angle(lm):.1f}, "
+                        f"y_schulter_r={lm[12].y:.3f}, "
                         f"y_hufte_r={lm[24].y:.3f}, "
-                        f"diff={lm[24].y - lm[12].y:.3f}, "
-                        f"y_handgelenk_r={lm[16].y:.3f}, "
                         f"movement={movement}"
                     )
 
