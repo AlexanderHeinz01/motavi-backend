@@ -12,18 +12,35 @@ import asyncio
 import json
 import logging
 import tempfile
+import urllib.request
 from pathlib import Path
 
 import cv2
 import mediapipe as mp
 import numpy as np
+from mediapipe.tasks.python import vision
+from mediapipe.tasks.python.core.base_options import BaseOptions
+from mediapipe.tasks.python.vision import PoseLandmarker, PoseLandmarkerOptions
 
 from ..config import settings
 from . import gcs
 
 logger = logging.getLogger(__name__)
 
-_mp_pose = mp.solutions.pose
+# ── MediaPipe Tasks model ─────────────────────────────────────────────────────
+_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
+    "pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task"
+)
+_MODEL_PATH = Path("/tmp/pose_landmarker_heavy.task")
+
+
+def _ensure_model() -> None:
+    """Download the pose landmarker model file if not already cached."""
+    if not _MODEL_PATH.exists():
+        logger.info("Downloading pose model → %s", _MODEL_PATH)
+        urllib.request.urlretrieve(_MODEL_URL, _MODEL_PATH)
+        logger.info("Pose model downloaded (%d bytes)", _MODEL_PATH.stat().st_size)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -157,10 +174,10 @@ def _anonymise_frame(frame: np.ndarray, pose_result) -> np.ndarray:
         return frame
 
     h, w = frame.shape[:2]
-    lm = pose_result.pose_landmarks.landmark
+    lm = pose_result.pose_landmarks[0]  # first detected person (Tasks API)
 
-    vis_y = [lm[i].y * h for i in range(33) if lm[i].visibility > 0.3]
-    vis_x = [lm[i].x * w for i in range(33) if lm[i].visibility > 0.3]
+    vis_y = [lm[i].y * h for i in range(33) if (lm[i].visibility or 0) > 0.3]
+    vis_x = [lm[i].x * w for i in range(33) if (lm[i].visibility or 0) > 0.3]
     if not vis_y:
         return frame
 
@@ -216,12 +233,12 @@ def _run(job_id: str) -> None:
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(anon_path), fourcc, fps, (frame_w, frame_h))
 
-        pose = _mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=1,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
+        _ensure_model()
+        options = PoseLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=str(_MODEL_PATH)),
+            running_mode=vision.RunningMode.IMAGE,
         )
+        landmarker = PoseLandmarker.create_from_options(options)
 
         sampled: list[dict] = []
         frame_idx = 0
@@ -232,13 +249,14 @@ def _run(job_id: str) -> None:
             if not ret:
                 break
 
-            rgb     = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = pose.process(rgb)
-            frame   = _anonymise_frame(frame, results)
+            rgb      = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+            result   = landmarker.detect(mp_image)
+            frame    = _anonymise_frame(frame, result)
             writer.write(frame)
 
-            if frame_idx % sample_interval == 0 and results.pose_landmarks:
-                lm      = results.pose_landmarks.landmark
+            if frame_idx % sample_interval == 0 and result.pose_landmarks:
+                lm      = result.pose_landmarks[0]  # first detected person
                 scores  = _reba_subscores(lm, frame_w, frame_h)
                 overall = _overall_reba(scores)
                 minute  = int(frame_idx / fps / 60)
@@ -269,7 +287,7 @@ def _run(job_id: str) -> None:
 
         cap.release()
         writer.release()
-        pose.close()
+        landmarker.close()
 
         # Push anonymised video to GCS
         anon_bytes = anon_path.read_bytes()
