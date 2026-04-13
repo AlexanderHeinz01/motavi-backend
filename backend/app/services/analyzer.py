@@ -292,6 +292,16 @@ def _run(job_id: str, meta: dict) -> None:
 
                 movement = _classify_movement(lm)
 
+                frame_nr = len(sampled) + 1  # 1-indexed sample count
+                if frame_nr <= 10:
+                    print(
+                        f"Frame {frame_nr}: y_schulter_r={lm[12].y:.3f}, "
+                        f"y_hufte_r={lm[24].y:.3f}, "
+                        f"diff={lm[24].y - lm[12].y:.3f}, "
+                        f"y_handgelenk_r={lm[16].y:.3f}, "
+                        f"movement={movement}"
+                    )
+
                 sampled.append({
                     "frame":         frame_idx,
                     "second":        round(frame_idx / fps, 1),
