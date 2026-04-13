@@ -401,7 +401,7 @@ def _build_action_items(regions: dict[str, float], bend_pct: float, over_pct: fl
     items: list[dict] = []
 
     lumbar = regions.get("lumbar", 0)
-    if lumbar > 5:
+    if lumbar > 5 and bend_pct > 0:
         items.append({
             "priority":      "CRITICAL",
             "region":        "Lendenwirbel",
@@ -434,7 +434,7 @@ def _build_action_items(regions: dict[str, float], bend_pct: float, over_pct: fl
         })
 
     shoulder = max(regions.get("shoulder_l", 0), regions.get("shoulder_r", 0))
-    if over_pct > 15 or shoulder > 6:
+    if over_pct > 0 and (over_pct > 15 or shoulder > 6):
         items.append({
             "priority":      "CRITICAL" if over_pct > 20 else "MEDIUM",
             "region":        "Schulter",
