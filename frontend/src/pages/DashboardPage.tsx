@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { getReportPdfUrl } from '../api/motavi'
+import { getFrameUrl, getReportPdfUrl } from '../api/motavi'
 import ActionItems   from '../components/ActionItems'
 import BodyHeatmap   from '../components/BodyHeatmap'
 import MovementChart from '../components/MovementChart'
@@ -163,6 +163,41 @@ export default function DashboardPage() {
               </Card>
 
             </div>
+
+            {/* 6 — Critical frames */}
+            {result.critical_frames && result.critical_frames.length > 0 && (
+              <div className="mt-5">
+                <Card title="Kritische Bewegungsmomente" className="">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {result.critical_frames.map((cf) => {
+                      const mm = String(Math.floor(cf.second / 60)).padStart(2, '0')
+                      const ss = String(Math.round(cf.second % 60)).padStart(2, '0')
+                      const mvLabel = cf.movement === 'overhead' ? 'Überkopf'
+                        : cf.movement === 'bending' ? 'Bücken' : 'Schulter'
+                      return (
+                        <div key={cf.rank}
+                          className="flex flex-col rounded-xl overflow-hidden border border-bg-primary bg-bg-primary">
+                          <img
+                            src={getFrameUrl(result.job_id, `critical_${cf.rank}.jpg`)}
+                            alt={`Kritischer Frame ${cf.rank}`}
+                            className="w-full aspect-video object-cover"
+                          />
+                          <div className="p-3 flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono text-xs text-neutral/50">{mm}:{ss}</span>
+                              <span className="font-mono text-sm font-bold" style={{ color: '#e63946' }}>
+                                REBA {cf.reba.toFixed(1)}
+                              </span>
+                            </div>
+                            <span className="font-body text-xs text-neutral/40">{mvLabel}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </Card>
+              </div>
+            )}
           </>
         )}
       </main>

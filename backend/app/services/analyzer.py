@@ -315,7 +315,11 @@ def _run(job_id: str, meta: dict) -> None:
             "video/mp4",
         )
 
+        # Extract top-3 critical frames while anon_path is still on disk
+        critical_frames = _extract_critical_frames(job_id, sampled, anon_path)
+
     result = _aggregate(job_id, sampled, fps, meta)
+    result["critical_frames"] = critical_frames
     gcs.upload_bytes(
         f"{settings.RESULTS_PREFIX}{job_id}/result.json",
         json.dumps(result).encode(),
@@ -470,8 +474,55 @@ def _empty_result(job_id: str, meta: dict | None = None) -> dict:
         },
         "timeline":         [],
         "timeline_frames":  [],
+        "critical_frames":  [],
         "action_items":     [],
     }
+
+
+def _extract_critical_frames(
+    job_id: str,
+    sampled: list[dict],
+    anon_path: Path,
+) -> list[dict]:
+    """Extract top-3 REBA frames from the anonymised video, overlay timestamp, upload to GCS."""
+    if not sampled:
+        return []
+
+    top3 = sorted(sampled, key=lambda f: f["reba"], reverse=True)[:3]
+    cap  = cv2.VideoCapture(str(anon_path))
+    result: list[dict] = []
+
+    for rank, fd in enumerate(top3, start=1):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, fd["frame"])
+        ret, frame = cap.read()
+        if not ret:
+            continue
+
+        sec   = fd["second"]
+        label = f"{int(sec // 60):02d}:{int(sec % 60):02d} \u00b7 REBA {fd['reba']:.1f}"
+        cv2.putText(
+            frame, label, (10, 35),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+            (255, 255, 255), 2, cv2.LINE_AA,
+        )
+
+        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not ok:
+            continue
+
+        filename = f"critical_{rank}.jpg"
+        gcs_path = f"{settings.RESULTS_PREFIX}{job_id}/frames/{filename}"
+        gcs.upload_bytes(gcs_path, buf.tobytes(), "image/jpeg")
+        result.append({
+            "rank":     rank,
+            "second":   round(sec, 1),
+            "reba":     fd["reba"],
+            "movement": fd["movement"],
+            "gcs_path": gcs_path,
+        })
+
+    cap.release()
+    return result
 
 
 def _write_error(job_id: str, msg: str) -> None:

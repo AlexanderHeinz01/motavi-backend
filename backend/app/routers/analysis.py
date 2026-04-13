@@ -1,10 +1,14 @@
+import io
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from ..schemas.analysis import (
     ActionItem,
     AnalysisResult,
     AnalysisStatusResponse,
     BodyRegions,
+    CriticalFrame,
     MovementStats,
     TimelineFrame,
     TimelinePoint,
@@ -54,9 +58,21 @@ async def get_analysis(job_id: str) -> AnalysisStatusResponse:
             movements={k: MovementStats(**v) for k, v in result_data["movements"].items()},
             timeline=[TimelinePoint(**p) for p in result_data["timeline"]],
             timeline_frames=[TimelineFrame(**p) for p in result_data.get("timeline_frames", [])],
+            critical_frames=[CriticalFrame(**c) for c in result_data.get("critical_frames", [])],
             action_items=[ActionItem(**a) for a in result_data["action_items"]],
         )
     except Exception as exc:
         return AnalysisStatusResponse(status="error", error=f"Result parse error: {exc}")
 
     return AnalysisStatusResponse(status="done", result=result)
+
+
+@router.get("/frames/{job_id}/{filename}")
+async def get_frame(job_id: str, filename: str) -> StreamingResponse:
+    """Serve a critical frame JPEG from GCS."""
+    gcs_path = f"{settings.RESULTS_PREFIX}{job_id}/frames/{filename}"
+    try:
+        data = gcs.download_bytes(gcs_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Frame not found.")
+    return StreamingResponse(io.BytesIO(data), media_type="image/jpeg")

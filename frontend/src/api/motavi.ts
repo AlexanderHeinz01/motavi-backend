@@ -18,6 +18,14 @@ export interface TimelineFrame {
   movement: string
 }
 
+export interface CriticalFrame {
+  rank: number
+  second: number
+  reba: number
+  movement: string
+  gcs_path: string
+}
+
 export interface ActionItem {
   priority: 'CRITICAL' | 'MEDIUM'
   region: string
@@ -39,6 +47,7 @@ export interface AnalysisResult {
   movements: Record<string, { pct: number; minutes: number }>
   timeline: Array<{ minute: number; reba: number }>
   timeline_frames?: TimelineFrame[]
+  critical_frames?: CriticalFrame[]
   action_items: ActionItem[]
 }
 
@@ -88,4 +97,8 @@ export async function getAnalysisStatus(jobId: string): Promise<AnalysisStatus> 
 
 export function getReportPdfUrl(jobId: string): string {
   return `${API_BASE}/api/v1/report/${jobId}/pdf`
+}
+
+export function getFrameUrl(jobId: string, filename: string): string {
+  return `${API_BASE}/api/v1/frames/${jobId}/${filename}`
 }

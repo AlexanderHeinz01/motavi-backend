@@ -28,6 +28,14 @@ class TimelineFrame(BaseModel):
     movement: str  # "neutral" | "bending" | "overhead"
 
 
+class CriticalFrame(BaseModel):
+    rank: int
+    second: float
+    reba: float
+    movement: str
+    gcs_path: str
+
+
 class ActionItem(BaseModel):
     priority: str  # "CRITICAL" | "MEDIUM"
     region: str
@@ -49,6 +57,7 @@ class AnalysisResult(BaseModel):
     movements: Dict[str, MovementStats]
     timeline: List[TimelinePoint]
     timeline_frames: List[TimelineFrame] = []
+    critical_frames: List[CriticalFrame] = []
     action_items: List[ActionItem]
 
 
