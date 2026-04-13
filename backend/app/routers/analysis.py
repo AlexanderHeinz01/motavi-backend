@@ -6,6 +6,7 @@ from ..schemas.analysis import (
     AnalysisStatusResponse,
     BodyRegions,
     MovementStats,
+    TimelineFrame,
     TimelinePoint,
 )
 from ..services import gcs
@@ -52,6 +53,7 @@ async def get_analysis(job_id: str) -> AnalysisStatusResponse:
             body_regions=BodyRegions(**result_data["body_regions"]),
             movements={k: MovementStats(**v) for k, v in result_data["movements"].items()},
             timeline=[TimelinePoint(**p) for p in result_data["timeline"]],
+            timeline_frames=[TimelineFrame(**p) for p in result_data.get("timeline_frames", [])],
             action_items=[ActionItem(**a) for a in result_data["action_items"]],
         )
     except Exception as exc:

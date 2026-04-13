@@ -13,6 +13,11 @@ export interface UploadMeta {
   worker_height_cm?: number
 }
 
+export interface TimelineFrame {
+  second: number
+  movement: string
+}
+
 export interface ActionItem {
   priority: 'CRITICAL' | 'MEDIUM'
   region: string
@@ -33,6 +38,7 @@ export interface AnalysisResult {
   body_regions: Record<string, number>
   movements: Record<string, { pct: number; minutes: number }>
   timeline: Array<{ minute: number; reba: number }>
+  timeline_frames?: TimelineFrame[]
   action_items: ActionItem[]
 }
 

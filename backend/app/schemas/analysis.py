@@ -23,6 +23,11 @@ class TimelinePoint(BaseModel):
     reba: float
 
 
+class TimelineFrame(BaseModel):
+    second: float
+    movement: str  # "neutral" | "bending" | "overhead"
+
+
 class ActionItem(BaseModel):
     priority: str  # "CRITICAL" | "MEDIUM"
     region: str
@@ -43,6 +48,7 @@ class AnalysisResult(BaseModel):
     body_regions: BodyRegions
     movements: Dict[str, MovementStats]
     timeline: List[TimelinePoint]
+    timeline_frames: List[TimelineFrame] = []
     action_items: List[ActionItem]
 
 

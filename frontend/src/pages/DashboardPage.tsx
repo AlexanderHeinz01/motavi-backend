@@ -153,8 +153,8 @@ export default function DashboardPage() {
               </Card>
 
               {/* 4 — Timeline */}
-              <Card title="REBA-Zeitverlauf">
-                <TimelineChart timeline={result.timeline} />
+              <Card title="Bewegungszeitverlauf">
+                <TimelineChart timeline_frames={result.timeline_frames ?? []} />
               </Card>
 
               {/* 5 — Action items (full width) */}

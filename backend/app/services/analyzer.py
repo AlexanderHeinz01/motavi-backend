@@ -294,6 +294,7 @@ def _run(job_id: str, meta: dict) -> None:
 
                 sampled.append({
                     "frame":         frame_idx,
+                    "second":        round(frame_idx / fps, 1),
                     "minute":        minute,
                     "reba":          overall,
                     "region_scores": scores,
@@ -384,6 +385,10 @@ def _aggregate(job_id: str, sampled: list[dict], fps: float, meta: dict) -> dict
             "neutral":  {"pct": neut_pct, "minutes": round(shift_min * neut_pct / 100, 1)},
         },
         "timeline":    timeline,
+        "timeline_frames": [
+            {"second": f["second"], "movement": f["movement"]}
+            for f in sampled
+        ],
         "action_items": _build_action_items(region_avgs, bend_pct, over_pct),
     }
 
@@ -463,8 +468,9 @@ def _empty_result(job_id: str, meta: dict | None = None) -> dict:
             "overhead": {"pct": 0.0, "minutes": 0.0},
             "neutral":  {"pct": 100.0, "minutes": 0.0},
         },
-        "timeline":    [],
-        "action_items": [],
+        "timeline":         [],
+        "timeline_frames":  [],
+        "action_items":     [],
     }
 
 
