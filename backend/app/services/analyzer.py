@@ -182,8 +182,8 @@ def _classify_movement(lm) -> str:
 
     overhead = (y_wrist_r < y_shoulder_r - 0.05 or
                 y_wrist_l < y_shoulder_l - 0.05)
-    bending  = (y_shoulder_r < y_hip_r - 0.15 or
-                y_shoulder_l < y_hip_r - 0.15)
+    bending  = (y_shoulder_r < y_hip_r - 0.25 or
+                y_shoulder_l < y_hip_r - 0.25)
 
     if overhead:
         return "overhead"
