@@ -42,6 +42,10 @@ async def get_analysis(job_id: str) -> AnalysisStatusResponse:
     try:
         result = AnalysisResult(
             job_id=result_data["job_id"],
+            company_name=result_data.get("company_name"),
+            department=result_data.get("department"),
+            task_description=result_data.get("task_description"),
+            worker_height_cm=result_data.get("worker_height_cm"),
             shift_duration_min=result_data["shift_duration_min"],
             reba_score=result_data["reba_score"],
             reba_level=result_data["reba_level"],

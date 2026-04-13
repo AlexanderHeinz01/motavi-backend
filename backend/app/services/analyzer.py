@@ -205,22 +205,22 @@ def _anonymise_frame(frame: np.ndarray, pose_result) -> np.ndarray:
 # Pipeline entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def run_pipeline(job_id: str) -> None:
+async def run_pipeline(job_id: str, meta: dict | None = None) -> None:
     """BackgroundTask: anonymise + REBA analysis; write result to GCS."""
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _pipeline_sync, job_id)
+    await loop.run_in_executor(None, _pipeline_sync, job_id, meta or {})
 
 
-def _pipeline_sync(job_id: str) -> None:
+def _pipeline_sync(job_id: str, meta: dict) -> None:
     logger.info("Pipeline start: %s", job_id)
     try:
-        _run(job_id)
+        _run(job_id, meta)
     except Exception:
         logger.exception("Pipeline failed: %s", job_id)
         _write_error(job_id, "Analysis pipeline failed — see server logs.")
 
 
-def _run(job_id: str) -> None:
+def _run(job_id: str, meta: dict) -> None:
     raw_path = f"{settings.UPLOAD_PREFIX}{job_id}/video.mp4"
     video_bytes = gcs.download_bytes(raw_path)
 
@@ -301,7 +301,7 @@ def _run(job_id: str) -> None:
             "video/mp4",
         )
 
-    result = _aggregate(job_id, sampled, fps)
+    result = _aggregate(job_id, sampled, fps, meta)
     gcs.upload_bytes(
         f"{settings.RESULTS_PREFIX}{job_id}/result.json",
         json.dumps(result).encode(),
@@ -314,9 +314,9 @@ def _run(job_id: str) -> None:
 # Aggregation
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _aggregate(job_id: str, sampled: list[dict], fps: float) -> dict:
+def _aggregate(job_id: str, sampled: list[dict], fps: float, meta: dict) -> dict:
     if not sampled:
-        return _empty_result(job_id)
+        return _empty_result(job_id, meta)
 
     reba_vals = [f["reba"] for f in sampled]
     avg_reba  = float(np.mean(reba_vals))
@@ -333,8 +333,8 @@ def _aggregate(job_id: str, sampled: list[dict], fps: float) -> dict:
     n_overhead = sum(1 for f in sampled if f["overhead"])
     n_neutral  = n - n_bend - n_overhead
 
-    total_secs  = len(sampled) * max(1, int(fps)) / fps
-    shift_min   = max(1, int(total_secs / 60))
+    total_secs = len(sampled) * max(1, int(fps)) / fps
+    shift_min  = int(meta.get("shift_duration_min") or max(1, int(total_secs / 60)))
 
     bend_pct  = round(n_bend     / n * 100, 1)
     over_pct  = round(n_overhead / n * 100, 1)
@@ -356,11 +356,15 @@ def _aggregate(job_id: str, sampled: list[dict], fps: float) -> dict:
     else:               level = "VERY_HIGH"
 
     return {
-        "job_id":            job_id,
+        "job_id":             job_id,
+        "company_name":       meta.get("company_name"),
+        "department":         meta.get("department"),
+        "task_description":   meta.get("task_description"),
+        "worker_height_cm":   meta.get("worker_height_cm"),
         "shift_duration_min": shift_min,
-        "reba_score":        round(avg_reba, 2),
-        "reba_level":        level,
-        "body_regions":      region_avgs,
+        "reba_score":         round(avg_reba, 2),
+        "reba_level":         level,
+        "body_regions":       region_avgs,
         "movements": {
             "bending":  {"pct": bend_pct, "minutes": round(shift_min * bend_pct / 100, 1)},
             "overhead": {"pct": over_pct, "minutes": round(shift_min * over_pct / 100, 1)},
@@ -429,10 +433,15 @@ def _build_action_items(regions: dict[str, float], bend_pct: float, over_pct: fl
     return items
 
 
-def _empty_result(job_id: str) -> dict:
+def _empty_result(job_id: str, meta: dict | None = None) -> dict:
+    m = meta or {}
     return {
         "job_id":             job_id,
-        "shift_duration_min": 0,
+        "company_name":       m.get("company_name"),
+        "department":         m.get("department"),
+        "task_description":   m.get("task_description"),
+        "worker_height_cm":   m.get("worker_height_cm"),
+        "shift_duration_min": int(m.get("shift_duration_min") or 0),
         "reba_score":         1.0,
         "reba_level":         "LOW",
         "body_regions":       {k: 1.0 for k in _REGION_MAX},

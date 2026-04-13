@@ -33,6 +33,10 @@ class ActionItem(BaseModel):
 class AnalysisResult(BaseModel):
     job_id: str
     worker_id: Optional[str] = None
+    company_name: Optional[str] = None
+    department: Optional[str] = None
+    task_description: Optional[str] = None
+    worker_height_cm: Optional[int] = None
     shift_duration_min: int
     reba_score: float
     reba_level: str  # "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH"

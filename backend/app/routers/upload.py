@@ -1,6 +1,7 @@
 import uuid
+from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from ..schemas.upload import UploadResponse
 from ..services import analyzer, gcs
@@ -21,6 +22,11 @@ _MAX_BYTES = 500 * 1024 * 1024  # 500 MB
 async def upload_video(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    company_name: Optional[str] = Form(None),
+    department: Optional[str] = Form(None),
+    task_description: Optional[str] = Form(None),
+    shift_duration_min: int = Form(480),
+    worker_height_cm: Optional[int] = Form(None),
 ) -> UploadResponse:
     """Accept a video file, store it in GCS, and trigger the analysis pipeline."""
     if file.content_type and file.content_type not in _ALLOWED_TYPES:
@@ -43,6 +49,13 @@ async def upload_video(
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"GCS upload failed: {exc}") from exc
 
-    background_tasks.add_task(analyzer.run_pipeline, job_id)
+    meta = {
+        "company_name":       company_name,
+        "department":         department,
+        "task_description":   task_description,
+        "shift_duration_min": shift_duration_min,
+        "worker_height_cm":   worker_height_cm,
+    }
+    background_tasks.add_task(analyzer.run_pipeline, job_id, meta)
 
     return UploadResponse(job_id=job_id, status="processing")

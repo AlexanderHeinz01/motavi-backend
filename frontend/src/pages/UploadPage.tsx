@@ -1,9 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { uploadVideoWithProgress } from '../api/motavi'
+import { uploadVideoWithProgress, type UploadMeta } from '../api/motavi'
 import UploadZone from '../components/UploadZone'
 
 type Phase = 'idle' | 'selected' | 'uploading' | 'error'
+
+const inputCls =
+  'w-full px-3 py-2 rounded-lg bg-bg-primary border border-bg-secondary ' +
+  'focus:outline-none focus:border-data/50 font-body text-sm text-white ' +
+  'placeholder:text-neutral/25 transition-colors disabled:opacity-50'
 
 export default function UploadPage() {
   const navigate = useNavigate()
@@ -11,6 +16,10 @@ export default function UploadPage() {
   const [phase,    setPhase]    = useState<Phase>('idle')
   const [progress, setProgress] = useState(0)
   const [error,    setError]    = useState<string | null>(null)
+  const [meta,     setMeta]     = useState<UploadMeta>({ shift_duration_min: 480 })
+
+  const setField = <K extends keyof UploadMeta>(k: K, v: UploadMeta[K]) =>
+    setMeta(m => ({ ...m, [k]: v }))
 
   const handleFile = (f: File) => {
     setFile(f)
@@ -24,7 +33,7 @@ export default function UploadPage() {
     setError(null)
     setProgress(0)
     try {
-      const { job_id } = await uploadVideoWithProgress(file, setProgress)
+      const { job_id } = await uploadVideoWithProgress(file, setProgress, meta)
       navigate(`/analyzing/${job_id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload fehlgeschlagen.')
@@ -37,9 +46,11 @@ export default function UploadPage() {
       ? `${(bytes / 1_048_576).toFixed(1)} MB`
       : `${(bytes / 1024).toFixed(0)} KB`
 
+  const uploading = phase === 'uploading'
+
   return (
-    <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-6">
-      <div className="w-full max-w-xl flex flex-col gap-8">
+    <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-6 py-10">
+      <div className="w-full max-w-xl flex flex-col gap-6">
 
         {/* Header */}
         <div className="text-center">
@@ -54,13 +65,84 @@ export default function UploadPage() {
         {/* Divider */}
         <div className="h-px bg-bg-secondary" />
 
+        {/* Metadata form */}
+        <div className="flex flex-col gap-3">
+          <p className="font-body text-xs text-neutral/40 uppercase tracking-widest">
+            Analyseparameter
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="font-body text-xs text-neutral/50">Unternehmensname</span>
+              <input
+                type="text"
+                value={meta.company_name ?? ''}
+                onChange={e => setField('company_name', e.target.value || undefined)}
+                placeholder="optional"
+                disabled={uploading}
+                className={inputCls}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="font-body text-xs text-neutral/50">Bereich / Abteilung</span>
+              <input
+                type="text"
+                value={meta.department ?? ''}
+                onChange={e => setField('department', e.target.value || undefined)}
+                placeholder="optional"
+                disabled={uploading}
+                className={inputCls}
+              />
+            </label>
+            <label className="col-span-2 flex flex-col gap-1.5">
+              <span className="font-body text-xs text-neutral/50">Aufgabenbeschreibung</span>
+              <textarea
+                value={meta.task_description ?? ''}
+                onChange={e => setField('task_description', e.target.value || undefined)}
+                placeholder='optional — z. B. „Montage Karosserie, stehend"'
+                rows={2}
+                disabled={uploading}
+                className={`${inputCls} resize-none`}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="font-body text-xs text-neutral/50">
+                Schichtdauer (Min)<span className="text-accent ml-0.5">*</span>
+              </span>
+              <input
+                type="number"
+                value={meta.shift_duration_min}
+                onChange={e => setField('shift_duration_min', Math.max(1, Number(e.target.value) || 480))}
+                min={1}
+                max={720}
+                disabled={uploading}
+                className={inputCls}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="font-body text-xs text-neutral/50">Körpergröße (cm)</span>
+              <input
+                type="number"
+                value={meta.worker_height_cm ?? ''}
+                onChange={e => setField('worker_height_cm', e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="optional"
+                min={100}
+                max={220}
+                disabled={uploading}
+                className={inputCls}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="h-px bg-bg-secondary" />
+
         {/* Upload zone */}
-        <UploadZone onFile={handleFile} disabled={phase === 'uploading'} />
+        <UploadZone onFile={handleFile} disabled={uploading} />
 
         {/* Selected file preview */}
         {file && phase !== 'idle' && (
           <div className="flex items-center gap-3 p-4 rounded-xl bg-bg-secondary border border-bg-secondary">
-            {/* Video icon */}
             <svg className="w-8 h-8 text-data flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -69,7 +151,7 @@ export default function UploadPage() {
               <p className="font-body text-sm text-white truncate">{file.name}</p>
               <p className="font-mono text-xs text-neutral/40">{formatSize(file.size)}</p>
             </div>
-            {phase !== 'uploading' && (
+            {!uploading && (
               <button
                 onClick={() => { setFile(null); setPhase('idle') }}
                 className="text-neutral/30 hover:text-neutral/70 transition-colors"
@@ -84,7 +166,7 @@ export default function UploadPage() {
         )}
 
         {/* Progress bar */}
-        {phase === 'uploading' && (
+        {uploading && (
           <div className="flex flex-col gap-2">
             <div className="w-full h-1.5 rounded-full bg-bg-secondary overflow-hidden">
               <div

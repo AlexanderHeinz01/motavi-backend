@@ -5,6 +5,14 @@ export interface UploadResponse {
   status: string
 }
 
+export interface UploadMeta {
+  company_name?: string
+  department?: string
+  task_description?: string
+  shift_duration_min: number
+  worker_height_cm?: number
+}
+
 export interface ActionItem {
   priority: 'CRITICAL' | 'MEDIUM'
   region: string
@@ -15,6 +23,10 @@ export interface ActionItem {
 export interface AnalysisResult {
   job_id: string
   worker_id?: string
+  company_name?: string
+  department?: string
+  task_description?: string
+  worker_height_cm?: number
   shift_duration_min: number
   reba_score: number
   reba_level: string
@@ -33,11 +45,18 @@ export interface AnalysisStatus {
 export function uploadVideoWithProgress(
   file: File,
   onProgress: (pct: number) => void,
+  meta: UploadMeta = { shift_duration_min: 480 },
 ): Promise<UploadResponse> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     const form = new FormData()
     form.append('file', file)
+    if (meta.company_name)     form.append('company_name',     meta.company_name)
+    if (meta.department)       form.append('department',       meta.department)
+    if (meta.task_description) form.append('task_description', meta.task_description)
+    form.append('shift_duration_min', String(meta.shift_duration_min))
+    if (meta.worker_height_cm != null)
+      form.append('worker_height_cm', String(meta.worker_height_cm))
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
