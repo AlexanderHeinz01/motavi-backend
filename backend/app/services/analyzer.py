@@ -169,6 +169,31 @@ def _overall_reba(subscores: dict[str, float]) -> float:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Movement classification (geometry-based, independent of REBA score)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _classify_movement(lm) -> str:
+    """Classify movement using normalised landmark coordinates."""
+    y_wrist_r   = lm[16].y
+    y_wrist_l   = lm[15].y
+    y_shoulder_r = lm[12].y
+    y_shoulder_l = lm[11].y
+    y_hip_r     = lm[24].y
+
+    overhead = (y_wrist_r < y_shoulder_r - 0.05 or
+                y_wrist_l < y_shoulder_l - 0.05)
+    bending  = (y_shoulder_r < y_hip_r - 0.15 or
+                y_shoulder_l < y_hip_r - 0.15)
+
+    if overhead:
+        return "overhead"
+    elif bending:
+        return "bending"
+    else:
+        return "neutral"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Frame-level anonymisation
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -265,26 +290,14 @@ def _run(job_id: str, meta: dict) -> None:
                 overall = _overall_reba(scores)
                 minute  = int(frame_idx / fps / 60)
 
-                # Trunk angle (for movement classification)
-                mid_sh_x  = (lm[11].x + lm[12].x) / 2
-                mid_sh_y  = (lm[11].y + lm[12].y) / 2
-                mid_hip_x = (lm[23].x + lm[24].x) / 2
-                mid_hip_y = (lm[23].y + lm[24].y) / 2
-                tv        = np.array([mid_hip_x - mid_sh_x, mid_hip_y - mid_sh_y])
-                trunk_ang = float(np.degrees(
-                    np.arctan2(abs(tv[0]), abs(tv[1]) + 1e-8)
-                ))
-
-                # Overhead: wrist above shoulder in image (smaller y = higher)
-                overhead = (lm[15].y < lm[11].y) or (lm[16].y < lm[12].y)
+                movement = _classify_movement(lm)
 
                 sampled.append({
                     "frame":         frame_idx,
                     "minute":        minute,
                     "reba":          overall,
                     "region_scores": scores,
-                    "trunk_angle":   trunk_ang,
-                    "overhead":      overhead,
+                    "movement":      movement,
                 })
 
             frame_idx += 1
@@ -329,8 +342,8 @@ def _aggregate(job_id: str, sampled: list[dict], fps: float, meta: dict) -> dict
 
     # Movement classification
     n = len(sampled)
-    n_bend     = sum(1 for f in sampled if f["trunk_angle"] > 20 and not f["overhead"])
-    n_overhead = sum(1 for f in sampled if f["overhead"])
+    n_bend     = sum(1 for f in sampled if f["movement"] == "bending")
+    n_overhead = sum(1 for f in sampled if f["movement"] == "overhead")
     n_neutral  = n - n_bend - n_overhead
 
     total_secs = len(sampled) * max(1, int(fps)) / fps
