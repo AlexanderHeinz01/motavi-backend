@@ -185,15 +185,23 @@ def _trunk_angle(lm) -> float:
 
 
 def _classify_movement(lm) -> str:
-    """Classify movement using normalised landmark coordinates."""
-    y_handgelenk_r = lm[16].y
-    y_handgelenk_l = lm[15].y
-    y_schulter_r   = lm[12].y
-    y_schulter_l   = lm[11].y
+    """Classify movement using normalised landmark coordinates.
 
-    ueberkopf = (y_handgelenk_r < y_schulter_r - 0.05 or
-                 y_handgelenk_l < y_schulter_l - 0.05)
-    buecken   = _trunk_angle(lm) > 20
+    Overhead wird erkannt, sobald der Arm nach oben geht: Handgelenk auf/über
+    Schulterhöhe (mit +0.05 Toleranz für die Hochführ-Phase) ODER Ellbogen
+    bereits über der Schulterlinie. Kleinere y = höher im Bild.
+    """
+    y_handgelenk_r, y_handgelenk_l = lm[16].y, lm[15].y
+    y_ellbogen_r,   y_ellbogen_l   = lm[14].y, lm[13].y
+    y_schulter_r,   y_schulter_l   = lm[12].y, lm[11].y
+
+    ueberkopf = (
+        y_handgelenk_r < y_schulter_r + 0.05 or
+        y_handgelenk_l < y_schulter_l + 0.05 or
+        y_ellbogen_r   < y_schulter_r or
+        y_ellbogen_l   < y_schulter_l
+    )
+    buecken = _trunk_angle(lm) > 20
 
     if ueberkopf:
         return "overhead"
@@ -308,6 +316,8 @@ def _run(job_id: str, meta: dict) -> None:
                     print(
                         f"Frame {frame_nr} ({frame_time:.1f}s): "
                         f"trunk_angle={_trunk_angle(lm):.1f}, "
+                        f"y_handgelenk_r={lm[16].y:.3f}, "
+                        f"y_ellbogen_r={lm[14].y:.3f}, "
                         f"y_schulter_r={lm[12].y:.3f}, "
                         f"y_hufte_r={lm[24].y:.3f}, "
                         f"movement={movement}"
