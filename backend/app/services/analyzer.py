@@ -315,12 +315,11 @@ def _run(job_id: str, meta: dict) -> None:
                 if frame_nr <= 10:
                     print(
                         f"Frame {frame_nr} ({frame_time:.1f}s): "
-                        f"trunk_angle={_trunk_angle(lm):.1f}, "
-                        f"y_handgelenk_r={lm[16].y:.3f}, "
-                        f"y_ellbogen_r={lm[14].y:.3f}, "
-                        f"y_schulter_r={lm[12].y:.3f}, "
-                        f"y_hufte_r={lm[24].y:.3f}, "
-                        f"movement={movement}"
+                        f"trunk={_trunk_angle(lm):.1f} "
+                        f"wr={lm[16].y:.3f} wl={lm[15].y:.3f} "
+                        f"er={lm[14].y:.3f} el={lm[13].y:.3f} "
+                        f"sr={lm[12].y:.3f} sl={lm[11].y:.3f} "
+                        f"→ {movement}"
                     )
 
                 sampled.append({
