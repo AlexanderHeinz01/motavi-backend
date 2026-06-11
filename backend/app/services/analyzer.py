@@ -312,7 +312,7 @@ def _run(job_id: str, meta: dict) -> None:
 
                 frame_nr   = len(sampled) + 1  # 1-indexed sample count
                 frame_time = frame_nr / fps
-                if 15 <= frame_time <= 30:
+                if frame_nr <= 10:
                     print(
                         f"Frame {frame_nr} ({frame_time:.1f}s): "
                         f"trunk_angle={_trunk_angle(lm):.1f}, "
