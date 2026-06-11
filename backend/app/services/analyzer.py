@@ -310,8 +310,8 @@ def _run(job_id: str, meta: dict) -> None:
 
                 movement = _classify_movement(lm)
 
-                frame_nr   = len(sampled) + 1  # 1-indexed sample count
-                frame_time = frame_nr / fps
+                frame_nr   = len(sampled) + 1       # 1-indexed sample count
+                frame_time = frame_idx / fps        # echte Videosekunde
                 if frame_nr <= 10:
                     print(
                         f"Frame {frame_nr} ({frame_time:.1f}s): "
