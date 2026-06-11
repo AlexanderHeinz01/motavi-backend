@@ -310,18 +310,6 @@ def _run(job_id: str, meta: dict) -> None:
 
                 movement = _classify_movement(lm)
 
-                frame_nr   = len(sampled) + 1       # 1-indexed sample count
-                frame_time = frame_idx / fps        # echte Videosekunde
-                if frame_nr <= 10:
-                    print(
-                        f"Frame {frame_nr} ({frame_time:.1f}s): "
-                        f"trunk={_trunk_angle(lm):.1f} "
-                        f"wr={lm[16].y:.3f} wl={lm[15].y:.3f} "
-                        f"er={lm[14].y:.3f} el={lm[13].y:.3f} "
-                        f"sr={lm[12].y:.3f} sl={lm[11].y:.3f} "
-                        f"→ {movement}"
-                    )
-
                 sampled.append({
                     "frame":         frame_idx,
                     "second":        round(frame_idx / fps, 1),
