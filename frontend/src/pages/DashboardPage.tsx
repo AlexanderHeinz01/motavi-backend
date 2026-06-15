@@ -44,7 +44,7 @@ export default function DashboardPage() {
         <div className="max-w-md w-full p-8 rounded-2xl bg-bg-secondary text-center">
           <p className="font-headline text-xl text-accent mb-2">Analyse fehlgeschlagen</p>
           <p className="font-body text-sm text-neutral/60 mb-6">{error}</p>
-          <button onClick={() => navigate('/')}
+          <button onClick={() => navigate('/app')}
             className="px-6 py-2.5 rounded-xl bg-accent text-white font-body text-sm hover:bg-accent/90 transition-colors">
             Neues Video
           </button>
@@ -59,7 +59,7 @@ export default function DashboardPage() {
       <header className="border-b border-bg-secondary px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/app')}
             className="text-neutral/30 hover:text-neutral/70 transition-colors"
             aria-label="Zurück"
           >

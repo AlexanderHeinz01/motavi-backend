@@ -23,7 +23,7 @@ export default function AnalyzingPage() {
 
   useEffect(() => {
     if (status === 'done' && jobId) {
-      navigate(`/dashboard/${jobId}`, { replace: true })
+      navigate(`/app/dashboard/${jobId}`, { replace: true })
     }
   }, [status, jobId, navigate])
 
@@ -47,7 +47,7 @@ export default function AnalyzingPage() {
             <p className="font-headline text-lg text-accent mb-1">Analyse fehlgeschlagen</p>
             <p className="font-body text-sm text-neutral/60">{error}</p>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/app')}
               className="mt-4 px-5 py-2 rounded-lg bg-bg-secondary text-neutral/80
                 hover:text-white transition-colors font-body text-sm"
             >

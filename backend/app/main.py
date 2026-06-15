@@ -1,8 +1,8 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from .routers import analysis, report, upload
 
@@ -25,9 +25,26 @@ async def health() -> dict:
     return {"status": "ok"}
 
 
-# Serve pre-built React app in production (must be mounted last)
-_frontend_dist = os.path.join(
-    os.path.dirname(__file__), "..", "..", "frontend", "dist"
+# Serve the pre-built React SPA in production.
+# A catch-all route returns static files when they exist and falls back to
+# index.html for client-side routes (e.g. /app, /app/dashboard/:id) so that
+# deep links and hard refreshes resolve correctly.
+_frontend_dist = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
 )
 if os.path.isdir(_frontend_dist):
-    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="static")
+    _index_html = os.path.join(_frontend_dist, "index.html")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str) -> FileResponse:
+        # API routes are handled above; never serve the SPA for them.
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = os.path.normpath(os.path.join(_frontend_dist, full_path))
+        if (
+            full_path
+            and candidate.startswith(_frontend_dist)
+            and os.path.isfile(candidate)
+        ):
+            return FileResponse(candidate)
+        return FileResponse(_index_html)

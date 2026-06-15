@@ -34,7 +34,7 @@ export default function UploadPage() {
     setProgress(0)
     try {
       const { job_id } = await uploadVideoWithProgress(file, setProgress, meta)
-      navigate(`/analyzing/${job_id}`)
+      navigate(`/app/analyzing/${job_id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload fehlgeschlagen.')
       setPhase('error')
