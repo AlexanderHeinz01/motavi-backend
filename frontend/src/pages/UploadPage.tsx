@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadVideoWithProgress, type UploadMeta } from '../api/motavi'
+import { useAuth } from '../auth/AuthContext'
 import UploadZone from '../components/UploadZone'
 
 type Phase = 'idle' | 'selected' | 'uploading' | 'error'
@@ -12,6 +13,7 @@ const inputCls =
 
 export default function UploadPage() {
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const [file,     setFile]     = useState<File | null>(null)
   const [phase,    setPhase]    = useState<Phase>('idle')
   const [progress, setProgress] = useState(0)
@@ -50,6 +52,20 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-6 py-10">
+      {/* Account / logout */}
+      <div className="absolute top-4 right-4 flex items-center gap-3">
+        {user && (
+          <span className="font-body text-xs text-neutral/40 hidden sm:inline">{user.email}</span>
+        )}
+        <button
+          onClick={() => { logout(); navigate('/login') }}
+          className="font-body text-xs text-neutral/50 hover:text-white transition-colors
+            px-3 py-1.5 rounded-lg border border-bg-secondary"
+        >
+          Abmelden
+        </button>
+      </div>
+
       <div className="w-full max-w-xl flex flex-col gap-6">
 
         {/* Header */}

@@ -10,6 +10,15 @@ class Settings(BaseSettings):
     UPLOAD_PREFIX: str = "uploads/"
     RESULTS_PREFIX: str = "results/"
 
+    # ── Auth (JWT) ──────────────────────────────────────────────────────────
+    # HMAC secret for signing access tokens (inject via Secret Manager).
+    JWT_SECRET: str = ""
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    # Bootstrap key required by POST /auth/register to provision users.
+    # Empty disables registration entirely.
+    SETUP_KEY: str = ""
+
     class Config:
         env_file = ".env"
 

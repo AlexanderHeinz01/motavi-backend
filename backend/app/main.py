@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from .routers import analysis, report, upload
+from .routers import analysis, auth, report, upload
 
 app = FastAPI(title="Motavi API", version="0.2.0")
 
@@ -15,6 +15,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router,     prefix="/api/v1")
 app.include_router(upload.router,   prefix="/api/v1")
 app.include_router(analysis.router, prefix="/api/v1")
 app.include_router(report.router,   prefix="/api/v1")

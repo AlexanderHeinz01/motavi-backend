@@ -146,7 +146,7 @@ function Header() {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link to="/app" style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 500, color: '#fff', padding: '8px 18px', textDecoration: 'none', transition: 'border-color 0.2s', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '6px' }}
+          <Link to="/login" style={{ fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 500, color: '#fff', padding: '8px 18px', textDecoration: 'none', transition: 'border-color 0.2s', border: '1px solid rgba(255,255,255,0.35)', borderRadius: '6px' }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.7)')}
             onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)')}>
             Anmelden
