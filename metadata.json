@@ -1,8 +1,0 @@
-{
-  "name": "Motavi Backend",
-  "description": "Backend API and interactive developer portal for Motavi, featuring habit tracking, goals, task management, analytics, and authentication.",
-  "capabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ],
-  "permissions": []
-}

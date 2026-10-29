@@ -1,0 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary:   #0a0f1e;
+  --bg-secondary: #1a2744;
+  --accent:       #e63946;
+  --neutral:      #f4f4f6;
+  --data:         #00b4d8;
+  --text:         #ffffff;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
