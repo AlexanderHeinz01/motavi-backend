@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { getFrameUrl, getReportPdfUrl } from '../api/motavi'
 import { BERATER_ROLLEN } from '../api/workplace'
 import { useAuth } from '../auth/AuthContext'
@@ -6,6 +6,7 @@ import ActionItems   from '../components/ActionItems'
 import BodyHeatmap   from '../components/BodyHeatmap'
 import MovementChart from '../components/MovementChart'
 import REBAGauge     from '../components/REBAGauge'
+import SteckbriefTab from '../components/SteckbriefTab'
 import TimelineChart from '../components/TimelineChart'
 import { useAnalysis } from '../hooks/useAnalysis'
 
@@ -38,6 +39,9 @@ export default function DashboardPage() {
   const { status, result, error } = useAnalysis(jobId)
   const { user } = useAuth()
   const berater = !!user && BERATER_ROLLEN.includes(user.role)
+  // tab in the URL (?tab=steckbrief), so a link opens the Steckbrief directly
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') === 'steckbrief' ? 'steckbrief' : 'ergonomie'
 
   const loading = status === 'processing'
   const failed  = status === 'error'
@@ -86,7 +90,7 @@ export default function DashboardPage() {
             onClick={() => navigate(`/app/experte/${result.job_id}`)}
             className="px-4 py-2 rounded-lg bg-bg-secondary border border-neutral/10 hover:border-data/50 transition-colors font-body text-sm text-neutral/70 hover:text-white"
           >
-            Ablauf bewerten
+            Expertenansicht
           </button>
         )}
         {/* PDF Export */}
@@ -110,6 +114,21 @@ export default function DashboardPage() {
 
       {/* Dashboard grid */}
       <main className="max-w-6xl mx-auto px-6 py-8">
+        {result && (
+          <div role="tablist" aria-label="Auswertung" className="mb-6 inline-flex rounded-xl bg-bg-secondary p-1">
+            {([['ergonomie', 'Ergonomie'], ['steckbrief', 'Steckbrief']] as const).map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={tab === id}
+                onClick={() => setParams(id === 'steckbrief' ? { tab: id } : {}, { replace: true })}
+                className={`px-5 py-2 rounded-lg font-body text-sm transition-colors ${
+                  tab === id ? 'bg-bg-primary text-white' : 'text-neutral/55 hover:text-white'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {result && tab === 'steckbrief' && <SteckbriefTab jobId={result.job_id} />}
+
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <SkeletonCard className="h-72" />
@@ -120,7 +139,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {result && (
+        {result && tab === 'ergonomie' && (
           <>
             {/* Summary strip */}
             <div className="mb-6 flex flex-wrap gap-4 items-center">

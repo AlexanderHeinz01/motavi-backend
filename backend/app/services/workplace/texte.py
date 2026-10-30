@@ -40,30 +40,44 @@ def wert(kennzahl: str, x: float | None) -> str:
 
 
 def _zeile(k, werte: dict) -> str:
-    """One reason with the measured value behind it; the composite indices
-    show their most telling input instead of an abstract index."""
+    """One reason as a plain statement with the measured value behind it;
+    the composite indices show their most telling input."""
     if k.messwert is None:
-        return f"{k.text}: kein wiederkehrender Zyklus"
+        return "kein wiederkehrender Zyklus erkannt"
+    m = k.messwert
+    saetze = {
+        "verschwendung_anteil": lambda: f"{prozent(m)} der Zykluszeit sind Verschwendung",
+        "griffe_ausserhalb": lambda: f"{prozent(m)} der Griffe außerhalb des günstigen Greifraums",
+        "zykluszeit_vk": lambda: f"Zykluszeit schwankt um {prozent(m)}",
+        "zyklen_pro_schicht": lambda: f"{zahl(m)} Zyklen pro Schicht",
+        "zeitanteil_in_zyklen": lambda: f"{prozent(m)} der Zeit in wiederkehrenden Zyklen",
+        "anzahl_varianten": lambda: f"{zahl(m)} Variante" + ("" if m == 1 else "n"),
+        "besetzung_schwierigkeit": lambda: f"Stellenbesetzung: Schwierigkeit {zahl(m)} von 5",
+    }
     if k.kennzahl == "belastung_index" and werte.get("reba_mittel") is not None:
-        return f"{k.text}: REBA-Mittel {zahl(werte['reba_mittel'], 1)}"
+        return f"Belastung: REBA-Mittel {zahl(werte['reba_mittel'], 1)}"
     if k.kennzahl == "handhabbarkeit_index" and werte.get("teilegewicht_kg") is not None:
-        return f"{k.text}: {zahl(werte['teilegewicht_kg'], 1)} kg je Teil"
-    return f"{k.text}: {wert(k.kennzahl, k.messwert)}"
+        return f"Teilegewicht {zahl(werte['teilegewicht_kg'], 1)}\u00a0kg"
+    if k.kennzahl in saetze:
+        return saetze[k.kennzahl]()
+    return f"{k.text}: {wert(k.kennzahl, m)}"
 
 
-def _hoch(s: ScoreErgebnis, n: int) -> list:
+def _hoch(s: ScoreErgebnis) -> list:
     ks = [k for k in s.kriterien if k.beitrag is not None]
-    return sorted(ks, key=lambda k: -k.beitrag)[:n]
+    return sorted(ks, key=lambda k: -k.beitrag)
 
 
-def _niedrig(s: ScoreErgebnis, n: int) -> list:
+def _niedrig(s: ScoreErgebnis) -> list:
     ks = [k for k in s.kriterien if k.teilwert is not None]
-    return sorted(ks, key=lambda k: (k.teilwert, -k.gewicht))[:n]
+    return sorted(ks, key=lambda k: (k.teilwert, -k.gewicht))
 
 
 def gruende(empfehlung_id: str | None, v: ScoreErgebnis, a: ScoreErgebnis, werte: dict | None = None) -> list[str]:
     """Up to three measured values that decide the recommendation: the
-    criteria that raise a high score most, and the weakest ones of a low score."""
+    criteria that raise a high score most, and the weakest ones of a low
+    score. The same statement appears only once (the cycle variation counts
+    in both scores)."""
     if empfehlung_id is None:
         return []
     plan = {
@@ -74,8 +88,17 @@ def gruende(empfehlung_id: str | None, v: ScoreErgebnis, a: ScoreErgebnis, werte
     }[empfehlung_id]
     out: list[str] = []
     for f, s, n in plan:
-        if s.belastbar:
-            out += [_zeile(k, werte or {}) for k in f(s, n)]
+        if not s.belastbar:
+            continue
+        neu = 0
+        for k in f(s):
+            z = _zeile(k, werte or {})
+            if z in out:
+                continue
+            out.append(z)
+            neu += 1
+            if neu == n:
+                break
     return out
 
 

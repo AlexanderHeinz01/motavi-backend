@@ -216,6 +216,8 @@ def build(cfg: ScoringConfig, job_id: str, zyklen: ZyklusErgebnis, greifraum: Gr
             "vorschlag": vorschlag_typ.name if vorschlag_typ else None,
             "geaendert": bool(bestaetigung) and (regel.id if regel else None) != (vorschlag_typ.id if vorschlag_typ else None),
             "regeln": [asdict(r) for r in typ.regeln] if mit_auto else [],
+            # all types, for the expert's choice
+            "auswahl": [{"id": r.id, "name": r.name} for r in cfg.automatisierungstypen.regeln],
         },
         "zyklen": {
             "erkannt": zyklen.erkannt,

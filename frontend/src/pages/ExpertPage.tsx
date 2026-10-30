@@ -10,6 +10,7 @@ import {
   type Klasse,
 } from '../api/workplace'
 import { useAuth } from '../auth/AuthContext'
+import EmpfehlungBestaetigen from '../components/EmpfehlungBestaetigen'
 
 /**
  * Expert view (STECKBRIEF_MODUL §4.3): proposal of segments in the median
@@ -206,7 +207,7 @@ export default function ExpertPage() {
           </svg>
         </button>
         <h1 className="font-headline text-xl font-bold tracking-tight">MOTAVI</h1>
-        <span className="font-body text-sm text-neutral/60">Ablaufschritte bewerten</span>
+        <span className="font-body text-sm text-neutral/60">Ablauf und Empfehlung bewerten</span>
         <span className="font-mono text-xs text-neutral/30 hidden sm:block">{jobId.slice(0, 8)}…</span>
       </header>
 
@@ -355,6 +356,9 @@ export default function ExpertPage() {
             )}
           </>
         )}
+
+        {/* recommendation and type (§6.4); reloads after a saved review */}
+        {data && <EmpfehlungBestaetigen jobId={jobId} version={data.review?.bestaetigt_am} />}
       </main>
     </div>
   )
