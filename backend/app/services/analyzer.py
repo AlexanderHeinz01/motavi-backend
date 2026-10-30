@@ -4,7 +4,8 @@ Runs as a FastAPI BackgroundTask. Steps:
   1. Download raw video from GCS  (uploads/{job_id}/video.mp4)
   2. Per-frame: anonymise head region (MediaPipe Pose bbox, top 38 % of
      person height + 20 px padding), write anonymised mp4 back to GCS
-  3. REBA subscore calculation per sampled frame (every 25 frames ≈ 1 s)
+  3. REBA subscore calculation, movement class and upper arm angle per
+     sampled frame (every int(fps) frames, about one sample per second)
   4. Aggregate timeline, movement classes, body-region scores, action items
   5. Write results/{job_id}/result.json to GCS
 """
@@ -173,35 +174,55 @@ def _overall_reba(subscores: dict[str, float]) -> float:
 # Movement classification (geometry-based, independent of REBA score)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _trunk_angle(lm) -> float:
-    """Trunk inclination in degrees (0 = upright, 90 = horizontal)."""
-    hx = (lm[11].x + lm[12].x) / 2
-    hy = (lm[11].y + lm[12].y) / 2
-    sx = (lm[23].x + lm[24].x) / 2
-    sy = (lm[23].y + lm[24].y) / 2
-    dx = hx - sx
-    dy = hy - sy
+def _trunk_angle(lm, w: int, h: int) -> float:
+    """Trunk inclination in degrees (0 = upright, 90 = horizontal).
+
+    Computed in pixels like the REBA part: normalised x and y have different
+    scales unless the video is square.
+    """
+    sx = (lm[11].x + lm[12].x) / 2 * w
+    sy = (lm[11].y + lm[12].y) / 2 * h
+    hx = (lm[23].x + lm[24].x) / 2 * w
+    hy = (lm[23].y + lm[24].y) / 2 * h
+    dx = sx - hx
+    dy = sy - hy
     return math.degrees(math.atan2(abs(dx), abs(dy)))
 
 
-def _classify_movement(lm) -> str:
-    """Classify movement using normalised landmark coordinates.
+def _ear_height(lm) -> float:
+    """Normalised y of the ears (mean of the visible ones); nose as fallback."""
+    ears = [lm[i].y for i in (7, 8) if (lm[i].visibility or 0) > 0.3]
+    return sum(ears) / len(ears) if ears else lm[0].y
 
-    Overhead wird erkannt, sobald der Arm nach oben geht: Handgelenk auf/über
-    Schulterhöhe (mit +0.05 Toleranz für die Hochführ-Phase) ODER Ellbogen
-    bereits über der Schulterlinie. Kleinere y = höher im Bild.
+
+def _upper_arm_elevation(lm, w: int, h: int) -> float:
+    """Larger of both upper arm angles to the trunk in degrees, in pixels.
+
+    0 = arm hanging along the trunk, 90 = arm at shoulder height,
+    180 = arm straight up. 2D: an arm pointing at the camera appears lower.
     """
-    y_handgelenk_r, y_handgelenk_l = lm[16].y, lm[15].y
-    y_ellbogen_r,   y_ellbogen_l   = lm[14].y, lm[13].y
-    y_schulter_r,   y_schulter_l   = lm[12].y, lm[11].y
+    def p(i: int) -> np.ndarray:
+        return np.array([lm[i].x * w, lm[i].y * h])
 
-    ueberkopf = (
-        y_handgelenk_r < y_schulter_r + 0.05 or
-        y_handgelenk_l < y_schulter_l + 0.05 or
-        y_ellbogen_r   < y_schulter_r or
-        y_ellbogen_l   < y_schulter_l
-    )
-    buecken = _trunk_angle(lm) > 20
+    trunk_down = (p(23) + p(24)) / 2 - (p(11) + p(12)) / 2
+    angles = []
+    for shoulder, elbow in ((11, 13), (12, 14)):
+        arm = p(elbow) - p(shoulder)
+        denom = np.linalg.norm(arm) * np.linalg.norm(trunk_down) + 1e-8
+        angles.append(float(np.degrees(np.arccos(np.clip(np.dot(arm, trunk_down) / denom, -1.0, 1.0)))))
+    return max(angles)
+
+
+def _classify_movement(lm, w: int, h: int) -> str:
+    """Classify movement from landmark coordinates.
+
+    Overhead: a wrist above ear height (smaller y = higher in the image).
+    Bending: trunk inclination above settings.MOVEMENT_BENDING_DEG.
+    Overhead takes priority over bending.
+    """
+    ear_y = _ear_height(lm)
+    ueberkopf = min(lm[15].y, lm[16].y) < ear_y - settings.MOVEMENT_OVERHEAD_MARGIN
+    buecken = _trunk_angle(lm, w, h) > settings.MOVEMENT_BENDING_DEG
 
     if ueberkopf:
         return "overhead"
@@ -308,7 +329,8 @@ def _run(job_id: str, meta: dict) -> None:
                 overall = _overall_reba(scores)
                 minute  = int(frame_idx / fps / 60)
 
-                movement = _classify_movement(lm)
+                movement = _classify_movement(lm, frame_w, frame_h)
+                arm_deg  = _upper_arm_elevation(lm, frame_w, frame_h)
 
                 sampled.append({
                     "frame":         frame_idx,
@@ -317,6 +339,7 @@ def _run(job_id: str, meta: dict) -> None:
                     "reba":          overall,
                     "region_scores": scores,
                     "movement":      movement,
+                    "arm_deg":       arm_deg,
                 })
 
             frame_idx += 1
@@ -336,7 +359,9 @@ def _run(job_id: str, meta: dict) -> None:
         # Extract top-3 critical frames while anon_path is still on disk
         critical_frames = _extract_critical_frames(job_id, sampled, anon_path)
 
-    result = _aggregate(job_id, sampled, fps, meta)
+    # frame_idx counts every decoded frame, with or without a detected person
+    duration_s = frame_idx / fps
+    result = _aggregate(job_id, sampled, duration_s, meta)
     result["critical_frames"] = critical_frames
     gcs.upload_bytes(
         f"{settings.RESULTS_PREFIX}{job_id}/result.json",
@@ -350,7 +375,7 @@ def _run(job_id: str, meta: dict) -> None:
 # Aggregation
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _aggregate(job_id: str, sampled: list[dict], fps: float, meta: dict) -> dict:
+def _aggregate(job_id: str, sampled: list[dict], duration_s: float, meta: dict) -> dict:
     if not sampled:
         return _empty_result(job_id, meta)
 
@@ -369,12 +394,17 @@ def _aggregate(job_id: str, sampled: list[dict], fps: float, meta: dict) -> dict
     n_overhead = sum(1 for f in sampled if f["movement"] == "overhead")
     n_neutral  = n - n_bend - n_overhead
 
-    total_secs = len(sampled) * max(1, int(fps)) / fps
-    shift_min  = int(meta.get("shift_duration_min") or max(1, int(total_secs / 60)))
+    # Actual video duration, not only the samples with a detected person
+    shift_min  = int(meta.get("shift_duration_min") or max(1, int(duration_s / 60)))
 
     bend_pct  = round(n_bend     / n * 100, 1)
     over_pct  = round(n_overhead / n * 100, 1)
     neut_pct  = round(max(0.0, 100 - bend_pct - over_pct), 1)
+
+    # Arms above shoulder height: own metric, independent of the movement
+    # classes (not yet shown as a class in the dashboard)
+    arm_limit = settings.ARM_ELEVATION_DEG
+    arm_pct   = round(sum(1 for f in sampled if f["arm_deg"] >= arm_limit) / n * 100, 1)
 
     # Per-minute timeline
     by_minute: dict[int, list[float]] = {}
@@ -405,6 +435,12 @@ def _aggregate(job_id: str, sampled: list[dict], fps: float, meta: dict) -> dict
             "bending":  {"pct": bend_pct, "minutes": round(shift_min * bend_pct / 100, 1)},
             "overhead": {"pct": over_pct, "minutes": round(shift_min * over_pct / 100, 1)},
             "neutral":  {"pct": neut_pct, "minutes": round(shift_min * neut_pct / 100, 1)},
+        },
+        "arms_above_shoulder": {
+            "threshold_deg": arm_limit,
+            "pct":           arm_pct,
+            "minutes":       round(shift_min * arm_pct / 100, 1),
+            "max_deg":       round(max(f["arm_deg"] for f in sampled), 1),
         },
         "timeline":    timeline,
         "timeline_frames": [
@@ -489,6 +525,9 @@ def _empty_result(job_id: str, meta: dict | None = None) -> dict:
             "bending":  {"pct": 0.0, "minutes": 0.0},
             "overhead": {"pct": 0.0, "minutes": 0.0},
             "neutral":  {"pct": 100.0, "minutes": 0.0},
+        },
+        "arms_above_shoulder": {
+            "threshold_deg": settings.ARM_ELEVATION_DEG, "pct": 0.0, "minutes": 0.0, "max_deg": 0.0,
         },
         "timeline":         [],
         "timeline_frames":  [],

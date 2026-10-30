@@ -6,6 +6,7 @@ from fastapi.responses import StreamingResponse
 from ..schemas.analysis import (
     ActionItem,
     AnalysisResult,
+    ArmsAboveShoulder,
     AnalysisStatusResponse,
     BodyRegions,
     CriticalFrame,
@@ -56,6 +57,10 @@ async def get_analysis(job_id: str) -> AnalysisStatusResponse:
             reba_level=result_data["reba_level"],
             body_regions=BodyRegions(**result_data["body_regions"]),
             movements={k: MovementStats(**v) for k, v in result_data["movements"].items()},
+            arms_above_shoulder=(
+                ArmsAboveShoulder(**result_data["arms_above_shoulder"])
+                if result_data.get("arms_above_shoulder") else None
+            ),
             timeline=[TimelinePoint(**p) for p in result_data["timeline"]],
             timeline_frames=[TimelineFrame(**p) for p in result_data.get("timeline_frames", [])],
             critical_frames=[CriticalFrame(**c) for c in result_data.get("critical_frames", [])],

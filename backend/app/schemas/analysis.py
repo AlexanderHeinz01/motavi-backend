@@ -18,6 +18,13 @@ class MovementStats(BaseModel):
     minutes: float
 
 
+class ArmsAboveShoulder(BaseModel):
+    threshold_deg: float
+    pct: float
+    minutes: float
+    max_deg: float
+
+
 class TimelinePoint(BaseModel):
     minute: int
     reba: float
@@ -55,6 +62,8 @@ class AnalysisResult(BaseModel):
     reba_level: str  # "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH"
     body_regions: BodyRegions
     movements: Dict[str, MovementStats]
+    # Own metric, not yet a class in the dashboard
+    arms_above_shoulder: Optional[ArmsAboveShoulder] = None
     timeline: List[TimelinePoint]
     timeline_frames: List[TimelineFrame] = []
     critical_frames: List[CriticalFrame] = []
