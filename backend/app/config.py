@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # Empty disables registration entirely.
     SETUP_KEY: str = ""
 
+    # ── Steckbrief module ───────────────────────────────────────────────────
+    # Keep per-frame pose data (results/{job_id}/pose.npz, docs/POSE_DATEN.md)
+    WORKPLACE_POSE_RECORDING: bool = True
+
     class Config:
         env_file = ".env"
 

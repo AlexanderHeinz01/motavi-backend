@@ -1,0 +1,148 @@
+{
+ "action_items": [
+  {
+   "priority": "CRITICAL",
+   "reduction_pct": 50,
+   "region": "Schulter",
+   "text": "Überkopfarbeit: 46 % der Schichtzeit. Arbeitsmittel in Greifhöhe bringen."
+  },
+  {
+   "priority": "MEDIUM",
+   "reduction_pct": 20,
+   "region": "Lendenwirbel",
+   "text": "Moderate Lendenbelastung. Regelmäßige Entlastungspausen empfohlen."
+  },
+  {
+   "priority": "MEDIUM",
+   "reduction_pct": 15,
+   "region": "Nacken",
+   "text": "Nackenhaltung auffällig. Arbeitsoberfläche um 5–10 cm anheben."
+  },
+  {
+   "priority": "MEDIUM",
+   "reduction_pct": 25,
+   "region": "Unterarm",
+   "text": "Ungünstige Unterarmhaltung erkannt. Stützvorrichtungen prüfen."
+  }
+ ],
+ "arms_above_shoulder": {
+  "max_deg": 97.5,
+  "minutes": 1.0,
+  "pct": 100.0,
+  "threshold_deg": 90.0
+ },
+ "body_regions": {
+  "forearm": 4.5,
+  "knee_l": 6.174999999999999,
+  "knee_r": 6.5,
+  "lumbar": 3.076923076923077,
+  "neck": 3.9615384615384617,
+  "shoulder_l": 7.200000000000001,
+  "shoulder_r": 8.0
+ },
+ "company_name": null,
+ "critical_frames": [
+  {
+   "gcs_path": "results/testjob/frames/critical_1.jpg",
+   "movement": "neutral",
+   "rank": 1,
+   "reba": 7.64,
+   "second": 0.0
+  },
+  {
+   "gcs_path": "results/testjob/frames/critical_2.jpg",
+   "movement": "neutral",
+   "rank": 2,
+   "reba": 7.64,
+   "second": 1.0
+  },
+  {
+   "gcs_path": "results/testjob/frames/critical_3.jpg",
+   "movement": "neutral",
+   "rank": 3,
+   "reba": 7.64,
+   "second": 2.0
+  }
+ ],
+ "department": null,
+ "job_id": "testjob",
+ "movements": {
+  "bending": {
+   "minutes": 0.0,
+   "pct": 0.0
+  },
+  "neutral": {
+   "minutes": 0.5,
+   "pct": 53.8
+  },
+  "overhead": {
+   "minutes": 0.5,
+   "pct": 46.2
+  }
+ },
+ "reba_level": "HIGH",
+ "reba_score": 7.64,
+ "shift_duration_min": 1,
+ "task_description": null,
+ "timeline": [
+  {
+   "minute": 0,
+   "reba": 7.64
+  }
+ ],
+ "timeline_frames": [
+  {
+   "movement": "neutral",
+   "second": 0.0
+  },
+  {
+   "movement": "neutral",
+   "second": 1.0
+  },
+  {
+   "movement": "neutral",
+   "second": 2.0
+  },
+  {
+   "movement": "neutral",
+   "second": 3.0
+  },
+  {
+   "movement": "neutral",
+   "second": 4.0
+  },
+  {
+   "movement": "neutral",
+   "second": 5.0
+  },
+  {
+   "movement": "neutral",
+   "second": 6.0
+  },
+  {
+   "movement": "overhead",
+   "second": 7.0
+  },
+  {
+   "movement": "overhead",
+   "second": 8.0
+  },
+  {
+   "movement": "overhead",
+   "second": 9.0
+  },
+  {
+   "movement": "overhead",
+   "second": 10.0
+  },
+  {
+   "movement": "overhead",
+   "second": 11.0
+  },
+  {
+   "movement": "overhead",
+   "second": 12.0
+  }
+ ],
+ "worker_height_cm": null
+}

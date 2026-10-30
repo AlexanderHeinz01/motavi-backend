@@ -8,6 +8,10 @@ Runs as a FastAPI BackgroundTask. Steps:
      sampled frame (every int(fps) frames, about one sample per second)
   4. Aggregate timeline, movement classes, body-region scores, action items
   5. Write results/{job_id}/result.json to GCS
+
+Optional: a PoseRecorder (services/workplace/pose_store.py) keeps the
+per-frame landmarks for the Steckbrief module and writes
+results/{job_id}/pose.npz. It does not change result.json.
 """
 import os
 os.environ["DISPLAY"] = ""
@@ -269,22 +273,22 @@ def _anonymise_frame(frame: np.ndarray, pose_result) -> np.ndarray:
 # Pipeline entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def run_pipeline(job_id: str, meta: dict | None = None) -> None:
+async def run_pipeline(job_id: str, meta: dict | None = None, recorder=None) -> None:
     """BackgroundTask: anonymise + REBA analysis; write result to GCS."""
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _pipeline_sync, job_id, meta or {})
+    await loop.run_in_executor(None, _pipeline_sync, job_id, meta or {}, recorder)
 
 
-def _pipeline_sync(job_id: str, meta: dict) -> None:
+def _pipeline_sync(job_id: str, meta: dict, recorder=None) -> None:
     logger.info("Pipeline start: %s", job_id)
     try:
-        _run(job_id, meta)
+        _run(job_id, meta, recorder)
     except Exception:
         logger.exception("Pipeline failed: %s", job_id)
         _write_error(job_id, "Analysis pipeline failed — see server logs.")
 
 
-def _run(job_id: str, meta: dict) -> None:
+def _run(job_id: str, meta: dict, recorder=None) -> None:
     raw_path = f"{settings.UPLOAD_PREFIX}{job_id}/video.mp4"
     video_bytes = gcs.download_bytes(raw_path)
 
@@ -297,6 +301,9 @@ def _run(job_id: str, meta: dict) -> None:
         fps     = cap.get(cv2.CAP_PROP_FPS) or 25.0
         frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        if recorder is not None:
+            recorder.start(fps, frame_w, frame_h)
 
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(anon_path), fourcc, fps, (frame_w, frame_h))
@@ -320,6 +327,8 @@ def _run(job_id: str, meta: dict) -> None:
             rgb      = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
             result   = landmarker.detect(mp_image)
+            if recorder is not None:
+                recorder.add(frame_idx, result)
             frame    = _anonymise_frame(frame, result)
             writer.write(frame)
 
@@ -361,6 +370,9 @@ def _run(job_id: str, meta: dict) -> None:
 
     # frame_idx counts every decoded frame, with or without a detected person
     duration_s = frame_idx / fps
+    if recorder is not None:
+        _save_pose(job_id, recorder)
+
     result = _aggregate(job_id, sampled, duration_s, meta)
     result["critical_frames"] = critical_frames
     gcs.upload_bytes(
@@ -369,6 +381,18 @@ def _run(job_id: str, meta: dict) -> None:
         "application/json",
     )
     logger.info("Pipeline done: %s  REBA=%.1f", job_id, result["reba_score"])
+
+
+def _save_pose(job_id: str, recorder) -> None:
+    """Write pose.npz before result.json; a failure here never stops the analysis."""
+    try:
+        gcs.upload_bytes(
+            f"{settings.RESULTS_PREFIX}{job_id}/pose.npz",
+            recorder.to_npz_bytes(),
+            "application/octet-stream",
+        )
+    except Exception:
+        logger.exception("Saving pose data failed: %s", job_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

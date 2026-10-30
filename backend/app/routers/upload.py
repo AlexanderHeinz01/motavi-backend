@@ -3,8 +3,10 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
+from ..config import settings
 from ..schemas.upload import UploadResponse
 from ..services import analyzer, gcs
+from ..services.workplace.pose_store import PoseRecorder
 
 router = APIRouter()
 
@@ -56,6 +58,7 @@ async def upload_video(
         "shift_duration_min": shift_duration_min,
         "worker_height_cm":   worker_height_cm,
     }
-    background_tasks.add_task(analyzer.run_pipeline, job_id, meta)
+    recorder = PoseRecorder() if settings.WORKPLACE_POSE_RECORDING else None
+    background_tasks.add_task(analyzer.run_pipeline, job_id, meta, recorder)
 
     return UploadResponse(job_id=job_id, status="processing")

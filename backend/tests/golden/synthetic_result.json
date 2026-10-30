@@ -1,0 +1,132 @@
+{
+ "action_items": [
+  {
+   "priority": "CRITICAL",
+   "reduction_pct": 50,
+   "region": "Schulter",
+   "text": "Überkopfarbeit: 22 % der Schichtzeit. Arbeitsmittel in Greifhöhe bringen."
+  },
+  {
+   "priority": "MEDIUM",
+   "reduction_pct": 20,
+   "region": "Lendenwirbel",
+   "text": "Moderate Lendenbelastung. Regelmäßige Entlastungspausen empfohlen."
+  },
+  {
+   "priority": "MEDIUM",
+   "reduction_pct": 15,
+   "region": "Nacken",
+   "text": "Nackenhaltung auffällig. Arbeitsoberfläche um 5–10 cm anheben."
+  },
+  {
+   "priority": "MEDIUM",
+   "reduction_pct": 25,
+   "region": "Unterarm",
+   "text": "Ungünstige Unterarmhaltung erkannt. Stützvorrichtungen prüfen."
+  }
+ ],
+ "arms_above_shoulder": {
+  "max_deg": 179.0,
+  "minutes": 0.2,
+  "pct": 22.2,
+  "threshold_deg": 90.0
+ },
+ "body_regions": {
+  "forearm": 4.5,
+  "knee_l": 0.9499999999999998,
+  "knee_r": 1.0,
+  "lumbar": 3.5,
+  "neck": 3.888888888888889,
+  "shoulder_l": 7.199999999999999,
+  "shoulder_r": 8.0
+ },
+ "company_name": null,
+ "critical_frames": [
+  {
+   "gcs_path": "results/golden/frames/critical_1.jpg",
+   "movement": "bending",
+   "rank": 1,
+   "reba": 7.63,
+   "second": 1.0
+  },
+  {
+   "gcs_path": "results/golden/frames/critical_2.jpg",
+   "movement": "bending",
+   "rank": 2,
+   "reba": 7.63,
+   "second": 3.0
+  },
+  {
+   "gcs_path": "results/golden/frames/critical_3.jpg",
+   "movement": "overhead",
+   "rank": 3,
+   "reba": 7.63,
+   "second": 6.0
+  }
+ ],
+ "department": null,
+ "job_id": "golden",
+ "movements": {
+  "bending": {
+   "minutes": 0.4,
+   "pct": 44.4
+  },
+  "neutral": {
+   "minutes": 0.3,
+   "pct": 33.4
+  },
+  "overhead": {
+   "minutes": 0.2,
+   "pct": 22.2
+  }
+ },
+ "reba_level": "HIGH",
+ "reba_score": 6.23,
+ "shift_duration_min": 1,
+ "task_description": null,
+ "timeline": [
+  {
+   "minute": 0,
+   "reba": 6.23
+  }
+ ],
+ "timeline_frames": [
+  {
+   "movement": "bending",
+   "second": 0.0
+  },
+  {
+   "movement": "bending",
+   "second": 1.0
+  },
+  {
+   "movement": "neutral",
+   "second": 2.0
+  },
+  {
+   "movement": "bending",
+   "second": 3.0
+  },
+  {
+   "movement": "neutral",
+   "second": 5.0
+  },
+  {
+   "movement": "overhead",
+   "second": 6.0
+  },
+  {
+   "movement": "overhead",
+   "second": 7.0
+  },
+  {
+   "movement": "bending",
+   "second": 8.0
+  },
+  {
+   "movement": "neutral",
+   "second": 9.0
+  }
+ ],
+ "worker_height_cm": null
+}
