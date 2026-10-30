@@ -86,7 +86,7 @@
       "keep": "Beibehalten"
     },
     "erklaerung": {
-      "improve-then-automate": "Automatisierung lohnt sich, aber erst nach Bereinigung des Ablaufs. Die Wirtschaftlichkeit ist auf Basis des verbesserten Ablaufs gerechnet.",
+      "improve-then-automate": "Automatisierung lohnt sich, aber erst nach Bereinigung des Ablaufs.",
       "improve": "Verschwendung und Belastung lassen sich durch Gestaltung des Arbeitsplatzes lösen.",
       "automate": "Der Ablauf ist bereits schlank, wiederholt sich oft und ist gleichförmig.",
       "keep": "Weder Verbesserung noch Automatisierung bringen nennenswerten Nutzen."
@@ -158,5 +158,59 @@
 
   "wirtschaftlichkeit": {
     "hinweis": "Grobe Abschätzung, ersetzt kein Angebot."
+  },
+
+  "arbeitsplatz_check": {
+    "_kommentar": "Selbsttest der Website (WEBSITE_PLAN Abschnitt 4.2): jede Antwort setzt Kennzahlen auf einen typischen Wert, daraus rechnen dieselben Scores und Regeln wie im Steckbrief. Frage- und Antworttexte stehen auf der Website (src/content/steckbrief.ts), verknüpft über die ids.",
+    "fragen": [
+      {"id": "wiederholung", "antworten": [
+        {"id": "unter_50", "werte": {"zyklen_pro_schicht": 30}},
+        {"id": "50_bis_200", "werte": {"zyklen_pro_schicht": 120}},
+        {"id": "200_bis_600", "werte": {"zyklen_pro_schicht": 400}},
+        {"id": "ueber_600", "werte": {"zyklen_pro_schicht": 800}}
+      ]},
+      {"id": "gleichfoermigkeit", "antworten": [
+        {"id": "jeder_anders", "werte": {"zykluszeit_vk": 0.4}},
+        {"id": "mit_abweichungen", "werte": {"zykluszeit_vk": 0.25}},
+        {"id": "weitgehend_gleich", "werte": {"zykluszeit_vk": 0.12}},
+        {"id": "praktisch_identisch", "werte": {"zykluszeit_vk": 0.05}}
+      ]},
+      {"id": "varianten", "antworten": [
+        {"id": "eine", "werte": {"anzahl_varianten": 1}},
+        {"id": "2_bis_5", "werte": {"anzahl_varianten": 3}},
+        {"id": "6_bis_20", "werte": {"anzahl_varianten": 12}},
+        {"id": "ueber_20", "werte": {"anzahl_varianten": 40}}
+      ]},
+      {"id": "teile", "antworten": [
+        {"id": "klein_leicht", "werte": {"teilegewicht_kg": 1, "groesste_kante_cm": 20}},
+        {"id": "handlich", "werte": {"teilegewicht_kg": 6, "groesste_kante_cm": 50}},
+        {"id": "schwer_sperrig", "werte": {"teilegewicht_kg": 18, "groesste_kante_cm": 100}},
+        {"id": "sehr_schwer_gross", "werte": {"teilegewicht_kg": 35, "groesste_kante_cm": 180}}
+      ]},
+      {"id": "verschwendung", "antworten": [
+        {"id": "kaum", "werte": {"verschwendung_anteil": 0.03}},
+        {"id": "etwas", "werte": {"verschwendung_anteil": 0.1}},
+        {"id": "deutlich", "werte": {"verschwendung_anteil": 0.2}},
+        {"id": "viel", "werte": {"verschwendung_anteil": 0.35}}
+      ]},
+      {"id": "haltung", "antworten": [
+        {"id": "selten", "werte": {"reba_mittel": 2.5, "buecken_anteil": 0.02, "ueberkopf_anteil": 0.0, "drehung_anteil": 0.03, "griffe_ausserhalb": 0.05}},
+        {"id": "gelegentlich", "werte": {"reba_mittel": 4.5, "buecken_anteil": 0.08, "ueberkopf_anteil": 0.03, "drehung_anteil": 0.08, "griffe_ausserhalb": 0.15}},
+        {"id": "haeufig", "werte": {"reba_mittel": 7.0, "buecken_anteil": 0.2, "ueberkopf_anteil": 0.1, "drehung_anteil": 0.2, "griffe_ausserhalb": 0.3}},
+        {"id": "staendig", "werte": {"reba_mittel": 9.5, "buecken_anteil": 0.35, "ueberkopf_anteil": 0.2, "drehung_anteil": 0.35, "griffe_ausserhalb": 0.45}}
+      ]},
+      {"id": "zeitanteil", "antworten": [
+        {"id": "unter_viertel", "werte": {"zeitanteil_in_zyklen": 0.15}},
+        {"id": "etwa_haelfte", "werte": {"zeitanteil_in_zyklen": 0.5}},
+        {"id": "grossteil", "werte": {"zeitanteil_in_zyklen": 0.75}},
+        {"id": "ganze_schicht", "werte": {"zeitanteil_in_zyklen": 0.95}}
+      ]},
+      {"id": "besetzung", "antworten": [
+        {"id": "problemlos", "werte": {"besetzung_schwierigkeit": 1}},
+        {"id": "mit_aufwand", "werte": {"besetzung_schwierigkeit": 2}},
+        {"id": "schwierig", "werte": {"besetzung_schwierigkeit": 4}},
+        {"id": "kaum_zu_besetzen", "werte": {"besetzung_schwierigkeit": 5}}
+      ]}
+    ]
   }
 }

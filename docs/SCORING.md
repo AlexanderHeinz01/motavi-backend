@@ -21,7 +21,9 @@ Alles, was bewertet, steht in dieser Datei. Im Code gibt es keine Gewichte, Schw
 
 Beim Start prüft `backend/app/services/workplace/scoring_config.py` die Datei: Gewichte je Score in Summe 1, alle vier Kombinationen der Entscheidungstabelle genau einmal, bekannte Typen, Bandbreiten von klein nach groß. Eine fehlerhafte Datei verhindert den Start, statt still falsch zu rechnen. Pfad abweichend über die Umgebungsvariable `WORKPLACE_SCORING_CONFIG`. Das Docker-Image enthält `config/`.
 
-Die Website (Arbeitsplatz-Check, Repo `motavi`, Phase 3) soll dieselbe Datei nutzen. Wie sie dorthin kommt (Kopie per Skript beim Build oder Abruf vom Backend), ist noch offen.
+Die Website (Repo `motavi`) liest eine Kopie unter demselben Pfad: `npm run sync:scoring` kopiert sie aus diesem Repo. `test_arbeitsplatz_check.py` hier und `src/lib/scoring.test.ts` dort schlagen fehl, wenn die Kopie abweicht. Nach jeder Änderung an der Datei also im Website-Repo `npm run sync:scoring` ausführen.
+
+**Arbeitsplatz-Check** (`arbeitsplatz_check`): acht Fragen der Website mit je vier Antworten. Jede Antwort setzt Kennzahlen auf einen typischen Wert (z.B. „200 bis 600 Mal“ setzt 400 Zyklen pro Schicht), danach entscheiden dieselben Scores und Regeln wie im Steckbrief. Beim Laden wird geprüft, dass jede Kennzahl bekannt ist und jedes Kriterium beider Scores von einer Frage abgedeckt wird. Über alle 65.536 Antwortkombinationen ergibt der Check Verbessern 36 %, Beibehalten 31 %, Erst verbessern, dann automatisieren 22 %, Automatisieren 12 %.
 
 Messschwellen (Ruhe, Gehen, Zyklusdauer, Drehwinkel) stehen weiter beim jeweiligen Messverfahren (`CycleConfig`, `ReachConfig`, `SegmentConfig`, `BelastungConfig`). Sie bestimmen, was gemessen wird, nicht wie es bewertet wird.
 

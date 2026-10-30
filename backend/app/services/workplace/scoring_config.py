@@ -166,6 +166,23 @@ class Wirtschaftlichkeit(_Model):
     hinweis: str
 
 
+class CheckAntwort(_Model):
+    id: str
+    werte: dict[str, float] = Field(min_length=1)
+
+
+class CheckFrage(_Model):
+    id: str
+    antworten: list[CheckAntwort] = Field(min_length=2)
+
+
+class ArbeitsplatzCheck(_Model):
+    """Self-test of the website (WEBSITE_PLAN §4.2): each answer sets metrics
+    to a typical value; the same scores and rules as in the Steckbrief apply."""
+
+    fragen: list[CheckFrage] = Field(min_length=1)
+
+
 class ScoringConfig(_Model):
     version: int
     schritt_typen: dict[str, Literal["wertschoepfend", "notwendig", "verschwendung"]]
@@ -179,11 +196,15 @@ class ScoringConfig(_Model):
     automatisierungstypen: Typen
     kundenangaben: Kundenangaben
     wirtschaftlichkeit: Wirtschaftlichkeit
+    arbeitsplatz_check: ArbeitsplatzCheck
 
     @field_validator("schritt_typen", "vermeidbarer_anteil", mode="before")
     @classmethod
     def _skip_comments(cls, v):
         return {k: x for k, x in v.items() if not k.startswith("_")}
+
+    def _check_konsistent(self) -> None:
+        _check_konsistent_impl(self)
 
     @model_validator(mode="after")
     def _consistent(self):
@@ -192,12 +213,39 @@ class ScoringConfig(_Model):
                 raise ValueError(f"vermeidbarer_anteil: unbekannter Typ {typ!r}")
             if not 0 <= anteil <= 1:
                 raise ValueError(f"vermeidbarer_anteil {typ}: {anteil} liegt nicht zwischen 0 und 1")
+        self._check_konsistent()
         for regel in self.automatisierungstypen.regeln:
             for b in regel.bedingungen:
                 for typ in b.anteil_typen or []:
                     if typ not in self.schritt_typen:
                         raise ValueError(f"{regel.id}: unbekannter Typ {typ!r}")
         return self
+
+
+def _check_konsistent_impl(cfg: "ScoringConfig") -> None:
+    """Every metric of an answer is known, ids are unique, and every criterion
+    of both scores gets a value from some question (complete scores)."""
+    index_teile = {"belastung_index": set(cfg.belastung.teile), "handhabbarkeit_index": set(cfg.handhabbarkeit.teile)}
+    bekannt = {k.kennzahl for s in (cfg.verbesserungs_score, cfg.automatisierungs_score) for k in s.kriterien.values()}
+    bekannt = (bekannt - set(index_teile)) | set().union(*index_teile.values())
+    gesetzt: set[str] = set()
+    fragen_ids = [f.id for f in cfg.arbeitsplatz_check.fragen]
+    if len(set(fragen_ids)) != len(fragen_ids):
+        raise ValueError("arbeitsplatz_check: Frage-ids doppelt")
+    for f in cfg.arbeitsplatz_check.fragen:
+        ids = [a.id for a in f.antworten]
+        if len(set(ids)) != len(ids):
+            raise ValueError(f"arbeitsplatz_check {f.id}: Antwort-ids doppelt")
+        for a in f.antworten:
+            unbekannt = set(a.werte) - bekannt
+            if unbekannt:
+                raise ValueError(f"arbeitsplatz_check {f.id}/{a.id}: unbekannte Kennzahl {sorted(unbekannt)}")
+            gesetzt |= set(a.werte)
+    for s in (cfg.verbesserungs_score, cfg.automatisierungs_score):
+        for k in s.kriterien.values():
+            quelle = index_teile.get(k.kennzahl, {k.kennzahl})
+            if not quelle & gesetzt:
+                raise ValueError(f"arbeitsplatz_check: keine Frage liefert {k.kennzahl}")
 
 
 def load(path: str | Path | None = None) -> ScoringConfig:
