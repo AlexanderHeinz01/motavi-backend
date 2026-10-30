@@ -7,7 +7,10 @@ class Settings(BaseSettings):
     GOOGLE_APPLICATION_CREDENTIALS: str = ""
     # Cloud Run: SA key JSON injected from Secret Manager as env var
     GCP_SERVICE_ACCOUNT_KEY: str = ""
-    UPLOAD_PREFIX: str = "uploads/"
+    # Raw video: deleted right after the analysis, lifecycle 1 day as a
+    # safety net (docs/LOESCHKONZEPT.md). Before 30.10.2026 raw videos were
+    # stored under uploads/.
+    RAW_PREFIX: str = "raw/"
     RESULTS_PREFIX: str = "results/"
 
     # ── Movement classification (analyzer.py) ───────────────────────────────

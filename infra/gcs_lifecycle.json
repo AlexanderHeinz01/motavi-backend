@@ -1,0 +1,24 @@
+{
+  "rule": [
+    {
+      "action": { "type": "Delete" },
+      "condition": { "age": 1, "matchesPrefix": ["raw/"] }
+    },
+    {
+      "action": { "type": "Delete" },
+      "condition": { "age": 30, "matchesPrefix": ["results/"], "matchesSuffix": [".mp4", ".jpg", ".npz"] }
+    },
+    {
+      "action": { "type": "Delete" },
+      "condition": { "age": 365, "matchesPrefix": ["results/"], "matchesSuffix": [".json"] }
+    },
+    {
+      "action": { "type": "Delete" },
+      "condition": { "age": 1, "matchesPrefix": ["uploads/"], "matchesSuffix": ["/video.mp4"] }
+    },
+    {
+      "action": { "type": "Delete" },
+      "condition": { "age": 30, "matchesPrefix": ["uploads/"], "matchesSuffix": ["/video_anon.mp4"] }
+    }
+  ]
+}

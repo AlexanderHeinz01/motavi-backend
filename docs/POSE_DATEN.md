@@ -11,8 +11,7 @@ Ein- und ausschalten: `WORKPLACE_POSE_RECORDING` in `backend/app/config.py` (Sta
 ## Ablage und Löschfrist
 
 - Datei: `results/{job_id}/pose.npz` im selben Bucket wie Video und Ergebnis, geschrieben vor `result.json`.
-- **`pose.npz` unterliegt derselben Löschfrist wie das Video.** Wird das Video eines Jobs gelöscht, wird `pose.npz` mit gelöscht.
-- Hinweis: Eine automatische Löschung ist im Repo bisher nicht umgesetzt (keine Lifecycle-Regel für den Bucket im Code). Eine Regel muss beide Präfixe abdecken: `uploads/` (Rohvideo, anonymisiertes Video) und `results/` (`result.json`, Einzelbilder, `pose.npz`).
+- **`pose.npz` unterliegt derselben Löschfrist wie das anonymisierte Video: 30 Tage** (Lifecycle-Regel in `infra/gcs_lifecycle.json`). Das Originalvideo wird direkt nach der Auswertung gelöscht. Alle Fristen in `docs/LOESCHKONZEPT.md`.
 
 ## Inhalt
 

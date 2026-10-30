@@ -42,9 +42,20 @@ def test_upload_unsupported_type_returns_422():
 
 
 @patch("backend.app.routers.analysis.gcs.blob_exists", return_value=False)
-def test_analysis_unknown_job_returns_404(mock_exists):
+@patch("backend.app.routers.analysis.gcs.get_result", return_value=None)
+def test_analysis_unknown_job_returns_404(mock_result, mock_exists):
     response = client.get("/api/v1/analysis/nonexistent-job-id")
     assert response.status_code == 404
+    mock_exists.assert_called_once_with("raw/nonexistent-job-id/video.mp4")
+
+
+@patch("backend.app.routers.analysis.gcs.blob_exists", return_value=False)
+@patch("backend.app.routers.analysis.gcs.get_result", return_value={"error": "Analysis pipeline failed"})
+def test_analysis_finds_result_after_raw_video_was_deleted(mock_result, mock_exists):
+    response = client.get("/api/v1/analysis/done-job")
+    assert response.status_code == 200
+    assert response.json()["status"] == "error"
+    mock_exists.assert_not_called()
 
 
 @patch("backend.app.routers.analysis.gcs.blob_exists", return_value=True)

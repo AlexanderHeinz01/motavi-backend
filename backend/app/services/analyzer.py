@@ -1,13 +1,15 @@
 """MediaPipe-based REBA analysis pipeline.
 
 Runs as a FastAPI BackgroundTask. Steps:
-  1. Download raw video from GCS  (uploads/{job_id}/video.mp4)
+  1. Download raw video from GCS  (raw/{job_id}/video.mp4)
   2. Per-frame: anonymise head region (MediaPipe Pose bbox, top 38 % of
      person height + 20 px padding), write anonymised mp4 back to GCS
   3. REBA subscore calculation, movement class and upper arm angle per
      sampled frame (every int(fps) frames, about one sample per second)
   4. Aggregate timeline, movement classes, body-region scores, action items
   5. Write results/{job_id}/result.json to GCS
+  6. Delete the raw video, also when the analysis failed
+     (docs/LOESCHKONZEPT.md)
 
 Optional: a PoseRecorder (services/workplace/pose_store.py) keeps the
 per-frame landmarks for the Steckbrief module and writes
@@ -286,10 +288,23 @@ def _pipeline_sync(job_id: str, meta: dict, recorder=None) -> None:
     except Exception:
         logger.exception("Pipeline failed: %s", job_id)
         _write_error(job_id, "Analysis pipeline failed — see server logs.")
+    finally:
+        _delete_raw(job_id)
+
+
+def _delete_raw(job_id: str) -> None:
+    """Delete the raw video right after the analysis. If this fails, the
+    bucket lifecycle rule for raw/ deletes it after one day."""
+    path = gcs.raw_video_path(job_id)
+    try:
+        gcs.delete_blob(path)
+        logger.info("Raw video deleted: %s", job_id)
+    except Exception:
+        logger.exception("Deleting the raw video failed: %s", job_id)
 
 
 def _run(job_id: str, meta: dict, recorder=None) -> None:
-    raw_path = f"{settings.UPLOAD_PREFIX}{job_id}/video.mp4"
+    raw_path = gcs.raw_video_path(job_id)
     video_bytes = gcs.download_bytes(raw_path)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -360,7 +375,7 @@ def _run(job_id: str, meta: dict, recorder=None) -> None:
         # Push anonymised video to GCS
         anon_bytes = anon_path.read_bytes()
         gcs.upload_bytes(
-            f"{settings.UPLOAD_PREFIX}{job_id}/video_anon.mp4",
+            f"{settings.RESULTS_PREFIX}{job_id}/video_anon.mp4",
             anon_bytes,
             "video/mp4",
         )

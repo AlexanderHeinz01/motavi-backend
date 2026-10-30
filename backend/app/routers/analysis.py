@@ -29,18 +29,18 @@ async def get_analysis(job_id: str) -> AnalysisStatusResponse:
         - ``{"status": "done", "result": {...}}`` when complete.
         - ``{"status": "error", "error": "..."}`` on pipeline failure.
     """
-    upload_path = f"{settings.UPLOAD_PREFIX}{job_id}/video.mp4"
+    # The raw video exists only while the analysis runs (it is deleted right
+    # after), so look for the result first.
     try:
-        exists = gcs.blob_exists(upload_path)
+        result_data = gcs.get_result(job_id)
+        if result_data is None:
+            if gcs.blob_exists(gcs.raw_video_path(job_id)):
+                return AnalysisStatusResponse(status="processing")
+            raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found.")
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"GCS unavailable: {exc}") from exc
-
-    if not exists:
-        raise HTTPException(status_code=404, detail=f"Job {job_id!r} not found.")
-
-    result_data = gcs.get_result(job_id)
-    if result_data is None:
-        return AnalysisStatusResponse(status="processing")
 
     if "error" in result_data:
         return AnalysisStatusResponse(status="error", error=result_data["error"])

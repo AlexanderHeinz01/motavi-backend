@@ -7,9 +7,14 @@ from ..config import settings
 from ..dependencies import get_bucket
 
 
+def raw_video_path(job_id: str) -> str:
+    """Raw (not anonymised) video of a job; deleted right after the analysis."""
+    return f"{settings.RAW_PREFIX}{job_id}/video.mp4"
+
+
 def upload_video(job_id: str, data: bytes, content_type: str = "video/mp4") -> str:
     """Upload raw video bytes. Returns the GCS blob path."""
-    path = f"{settings.UPLOAD_PREFIX}{job_id}/video.mp4"
+    path = raw_video_path(job_id)
     _upload(path, data, content_type)
     return path
 
@@ -44,3 +49,12 @@ def get_result(job_id: str) -> Optional[dict]:
 def blob_exists(path: str) -> bool:
     """Return True if the GCS blob exists."""
     return get_bucket().blob(path).exists()
+
+
+def delete_blob(path: str) -> bool:
+    """Delete a blob. Returns False if it did not exist."""
+    blob = get_bucket().blob(path)
+    if not blob.exists():
+        return False
+    blob.delete()
+    return True
