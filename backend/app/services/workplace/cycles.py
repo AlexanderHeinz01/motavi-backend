@@ -33,7 +33,7 @@ MIN_CHANNEL_PRESENT = 0.6  # share of person frames in which a feature must be k
 
 @dataclass(frozen=True)
 class CycleConfig:
-    min_period_s: float = 3.0
+    min_period_s: float = 1.5
     max_period_s: float = 180.0
     min_cycles: int = 3  # at least this many valid cycles
     min_periodicity: float = 0.25  # autocorrelation at the period

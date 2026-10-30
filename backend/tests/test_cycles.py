@@ -17,7 +17,7 @@ def run(raw, shift_min=480.0, cfg=CycleConfig()):
     return detect_cycles_features(np.arange(len(raw)) / RATE, x, m, RATE, shift_min, cfg)
 
 
-@pytest.mark.parametrize("period", [3.5, 8.0, 12.0, 38.4, 60.0, 150.0])
+@pytest.mark.parametrize("period", [1.5, 2.0, 2.8, 3.5, 8.0, 12.0, 38.4, 60.0, 150.0])
 @pytest.mark.parametrize("noise", [0.1, 0.4])
 def test_known_period_within_5_percent(period, noise):
     n = 10 if period < 60 else (6 if period < 120 else 5)

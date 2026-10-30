@@ -7,7 +7,7 @@ Stand: 30.10.2026. Umsetzung von `docs/STECKBRIEF_MODUL.md` Abschnitt 4.1 und 4.
 **Merkmale je Bild:** beide Handgelenke (x, y relativ zur Hüftmitte, in Rumpflängen), Rumpfneigung und Schulterbreite (ändert sich, wenn sich der Rumpf dreht). Jeder Kanal wird standardisiert.
 
 **Verfahren:**
-1. **Periode:** Autokorrelation je Kanal, nur über Bildpaare mit erkannter Person. Die Kanäle werden danach gewichtet, wie stark sie sich bewegen (Betrag der Autokorrelation bei 0,5 s und 1 s). Eine ruhende Hand, die nur rauscht, verdünnt so nicht die Periode der arbeitenden Hand. Gesucht wird im Bereich 3 bis 180 s; es müssen mindestens drei Perioden in die Aufnahme passen. Gewählt wird der erste Gipfel, der mindestens 85 % des höchsten erreicht, damit Oberschwingungen nicht die halbe Periode liefern.
+1. **Periode:** Autokorrelation je Kanal, nur über Bildpaare mit erkannter Person. Die Kanäle werden danach gewichtet, wie stark sie sich bewegen (Betrag der Autokorrelation bei 0,5 s und 1 s). Eine ruhende Hand, die nur rauscht, verdünnt so nicht die Periode der arbeitenden Hand. Gesucht wird im Bereich 1,5 bis 180 s (Untergrenze am 30.10.2026 von 3 s gesenkt, weil ein echtes Video einen Zyklus von 2,8 s zeigte); es müssen mindestens drei Perioden in die Aufnahme passen. Gewählt wird der erste Gipfel, der mindestens 85 % des höchsten erreicht, damit Oberschwingungen nicht die halbe Periode liefern.
 2. **Zyklusgrenzen:** Das Fenster einer Periodenlänge, das sich am besten wiederholt, wird zur Vorlage. Eine normierte Kreuzkorrelation (je Kanal, gewichtet) findet ihre Wiederholungen. Der Mittelwert der gefundenen Zyklen wird zur verfeinerten Vorlage, und die Suche läuft noch einmal. Bei langen Zyklen werden die Merkmale vorher über etwa 1/40 der Periode geglättet.
 3. **Ausreißer:** Ein Abstand über 135 % des Medians wird geteilt in einen typischen Zyklus und eine **Unterbrechung** (Pause, Nebentätigkeit). Unter 65 % heißt „zu kurz“, eine Ähnlichkeit zur Vorlage unter 0,5 „weicht vom typischen Ablauf ab“, fehlende Bilder „Lücke in den Daten“. Ausreißer zählen nicht für die Zykluszeit.
 
@@ -48,4 +48,4 @@ Läuft lokal, lädt nichts hoch. Zeigt das Merkmalssignal mit Zyklen, Ausreißer
 
 ## Tests
 
-`backend/tests/test_cycles.py` (bekannte Perioden 3 bis 150 s mit Rauschen, schwankende Zykluslänge, Pause, Datenlücke, zwei ähnliche Teilbewegungen, eine arbeitende Hand unter Rauschkanälen, aperiodische Bewegung, Stillstand, zu wenige Zyklen, Qualitätsschwelle) und `backend/tests/test_reach.py`. Zielwert der Abnahme: synthetische Perioden auf ±5 %.
+`backend/tests/test_cycles.py` (bekannte Perioden 1,5 bis 150 s mit Rauschen, schwankende Zykluslänge, Pause, Datenlücke, zwei ähnliche Teilbewegungen, eine arbeitende Hand unter Rauschkanälen, aperiodische Bewegung, Stillstand, zu wenige Zyklen, Qualitätsschwelle) und `backend/tests/test_reach.py`. Zielwert der Abnahme: synthetische Perioden auf ±5 %.
