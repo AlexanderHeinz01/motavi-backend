@@ -5,7 +5,9 @@ preprocess.prepare). Image y points downwards: negative y is above the hip.
 
 - Height zones with time shares, per frame and hand, with the body's own
   landmarks as borders: below knee, knee to hip, hip to shoulder, above
-  shoulder.
+  shoulder. Hidden knees (e.g. behind a bench): typical proportion, knee
+  0.9 trunk lengths below the hip. A hand that is mostly hidden (far side in
+  a side view) is left out.
 - Grips: the hand comes to rest (low speed for a short time) after it has
   moved. A grip lies outside the favourable reach when it is not between
   hip and shoulder or not close to the body (horizontal distance from the
@@ -37,7 +39,8 @@ class ReachConfig:
     move_speed: float = 1.0  # before a grip the hand moved at least this fast
     min_rest_s: float = 0.2
     move_window_s: float = 1.0
-    min_coverage: float = 0.6  # share of frames with both wrists
+    min_coverage: float = 0.6  # share of person frames in which a hand is visible
+    knee_fallback: float = 0.9  # knee below the hip in trunk lengths, if the knees are hidden
     min_grips: int = 10
     reliable: float = 0.5
     # density grid in trunk lengths: x left/right of the hip, y from above the head to the feet
@@ -58,7 +61,7 @@ class Griff:
 
 @dataclass(frozen=True)
 class GreifraumErgebnis:
-    hoehenzonen: dict[str, Kennzahl]  # time share per zone (both hands)
+    hoehenzonen: dict[str, Kennzahl]  # time share per zone (visible hands)
     griffe_ausserhalb: Kennzahl  # share of grips outside the favourable reach
     anzahl_griffe: int
     griffe: list[Griff]
@@ -86,19 +89,36 @@ def _runs(flag: np.ndarray) -> list[tuple[int, int]]:
     return list(zip(np.flatnonzero(d == 1), np.flatnonzero(d == -1)))
 
 
+def _knee(prep: Prepared, cfg: ReachConfig) -> np.ndarray:
+    """Knee height per frame: mean of the visible knees, else the typical proportion."""
+    k = np.column_stack([prep.joint("left_knee")[:, 1], prep.joint("right_knee")[:, 1]])
+    out = np.full(len(k), cfg.knee_fallback)
+    seen = ~np.isnan(k)
+    any_seen = seen.any(axis=1)
+    out[any_seen] = np.nanmean(k[any_seen], axis=1)
+    return out
+
+
 def analyse_reach(prep: Prepared, cfg: ReachConfig = ReachConfig()) -> GreifraumErgebnis:
     rate = prep.rate_hz
     sh = (prep.joint("left_shoulder")[:, :2] + prep.joint("right_shoulder")[:, :2]) / 2
-    knee_y = (prep.joint("left_knee")[:, 1] + prep.joint("right_knee")[:, 1]) / 2
+    knee_y = _knee(prep, cfg)
     hands = {"links": prep.joint("left_wrist")[:, :2], "rechts": prep.joint("right_wrist")[:, :2]}
 
-    both = prep.valid & ~np.isnan(hands["links"]).any(axis=1) & ~np.isnan(hands["rechts"]).any(axis=1)
-    coverage = float(both.mean()) if both.size else 0.0
+    # hands that are visible in enough person frames
+    seen = {h: prep.valid & ~np.isnan(w).any(axis=1) for h, w in hands.items()}
+    n_valid = max(1, int(prep.valid.sum()))
+    share = {h: float(s.sum()) / n_valid for h, s in seen.items()}
+    hands = {h: w for h, w in hands.items() if share[h] >= cfg.min_coverage}
+    # quality: share of frames with a person times the visibility of the used hands
+    person = float(prep.valid.mean()) if prep.valid.size else 0.0
+    coverage = person * float(np.mean([share[h] for h in hands])) if hands else 0.0
 
-    # height zones: share of frames, both hands counted
+    # height zones: share of frames, visible hands counted
     counts = np.zeros(4)
-    for w in hands.values():
-        z = _zone(w[both, 1], sh[both, 1], knee_y[both])
+    for h, w in hands.items():
+        s = seen[h]
+        z = _zone(w[s, 1], sh[s, 1], knee_y[s])
         counts += np.bincount(z[z >= 0], minlength=4)[:4]
     total = counts.sum()
     zone_q = coverage if total > 0 else 0.0
@@ -115,7 +135,7 @@ def analyse_reach(prep: Prepared, cfg: ReachConfig = ReachConfig()) -> Greifraum
         world = w + prep.hip  # hand in the image frame (trunk lengths): rest = hand stands still
         speed = np.full(len(w), np.nan)
         speed[1:] = np.linalg.norm(np.diff(world, axis=0), axis=1) * rate
-        rest = (speed < cfg.rest_speed) & prep.valid
+        rest = (speed < cfg.rest_speed) & seen[hand]
         for a, b in _runs(rest):
             if b - a < min_rest:
                 continue
@@ -139,7 +159,7 @@ def analyse_reach(prep: Prepared, cfg: ReachConfig = ReachConfig()) -> Greifraum
     # density over the silhouette
     gx = np.linspace(*cfg.grid_x[:2], cfg.grid_x[2] + 1)
     gy = np.linspace(*cfg.grid_y[:2], cfg.grid_y[2] + 1)
-    pts = np.vstack([w[both] for w in hands.values()])
+    pts = np.vstack([w[seen[h]] for h, w in hands.items()]) if hands else np.empty((0, 2))
     hist, _, _ = np.histogram2d(pts[:, 1], pts[:, 0], bins=[gy, gx]) if len(pts) else (np.zeros((len(gy) - 1, len(gx) - 1)), None, None)
     dichte = hist / hist.max() if hist.max() > 0 else hist
 

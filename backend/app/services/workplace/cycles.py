@@ -28,6 +28,7 @@ from .preprocess import Prepared
 from .quality import Kennzahl
 
 KEIN_ZYKLUS = "Kein wiederkehrender Zyklus erkannt"
+MIN_CHANNEL_PRESENT = 0.6  # share of person frames in which a feature must be known
 
 
 @dataclass(frozen=True)
@@ -91,7 +92,10 @@ def features(prep: Prepared) -> tuple[np.ndarray, np.ndarray]:
     width = np.linalg.norm(ls - rs, axis=1)  # rotation proxy
     raw = np.column_stack([lw, rw, trunk / 45.0, width])
     raw[~prep.valid] = np.nan
-    return standardise(raw)
+    # A hand that is mostly hidden (far side in a side view) drops out as a
+    # channel; it must not make every frame count as missing.
+    present = (~np.isnan(raw[prep.valid])).mean(axis=0) if prep.valid.any() else np.zeros(raw.shape[1])
+    return standardise(raw[:, present >= MIN_CHANNEL_PRESENT])
 
 
 def standardise(raw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

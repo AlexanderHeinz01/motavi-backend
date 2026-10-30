@@ -84,3 +84,18 @@ def test_density_normalised():
     t = np.arange(len(x)) / RATE
     r = analyse_reach(prepared_from_wrists(t, (x, y), (0.2 + 0 * t, 0.3 + 0 * t)))
     assert r.dichte.max() == pytest.approx(1.0) and r.dichte.shape == (25, 20)
+
+
+def test_hidden_far_hand_and_knees_side_view():
+    # side view: the right hand is hidden most of the time, knees behind a bench
+    x, y = moves([(0.4, -0.5), (1.4, -0.5)])
+    t = np.arange(len(x)) / RATE
+    prep = prepared_from_wrists(t, (x, y), (0.2 + 0 * t, 0.3 + 0 * t))
+    k = list(prep.names)
+    prep.rel[:, k.index("right_wrist")] = np.nan
+    prep.rel[:, k.index("left_knee")] = np.nan
+    prep.rel[:, k.index("right_knee")] = np.nan
+    r = analyse_reach(prep)
+    assert r.hoehenzonen["huefte_schulter"].belastbar
+    assert r.hoehenzonen["huefte_schulter"].wert == pytest.approx(1.0)
+    assert r.griffe_ausserhalb.wert == pytest.approx(0.5, abs=0.06)

@@ -30,6 +30,8 @@ Stand: 30.10.2026. Umsetzung von `docs/STECKBRIEF_MODUL.md` Abschnitt 4.1 und 4.
 - **Qualität:** Anteil der Bilder mit beiden Handgelenken; der Anteil der Griffe außerhalb braucht mindestens 10 erkannte Griffe.
 - **Hinweis** im Ergebnis: „Relative Werte aus 2D-Video. Für Zentimeterangaben ist eine Referenzmessung vor Ort nötig.“
 
+**Verdeckte Körperteile:** In Seitenansicht ist die abgewandte Hand oft verdeckt. Eine Hand, die in weniger als 60 % der Bilder mit Person sichtbar ist, bleibt bei Höhenzonen und Griffen außen vor; bei der Zykluserkennung fällt ihr Kanal heraus, statt alle Bilder ungültig zu machen. Verdeckte Knie (z.B. hinter einer Werkbank) werden durch die typische Proportion ersetzt (Knie 0,9 Rumpflängen unter der Hüfte). Die Qualität ist der Anteil der Bilder mit Person mal der Sichtbarkeit der verwendeten Hände.
+
 **Bekannte Grenzen:** Ein Griff in Richtung Kamera wirkt kürzer (2D). Eine Hand, die nach einer Bewegung kurz ruht, zählt als Griff, auch wenn sie nichts greift; die Ablaufschritte (S3) trennen das später.
 
 Alle Schwellen stehen in `CycleConfig` und `ReachConfig`. Mit Phase S4 wandern sie in `config/workplace_scoring.json`.

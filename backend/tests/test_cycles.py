@@ -143,3 +143,14 @@ def test_strong_noise(period, seed):
     _, raw, _ = periodic(period, n, rate=RATE, noise=0.6, seed=seed + 100)
     r = run(raw)
     assert r.erkannt and r.zykluszeit_median.wert == pytest.approx(period, rel=0.05)
+
+
+def test_hidden_far_hand_does_not_block_detection():
+    t = np.arange(int(120 * RATE)) / RATE
+    phase = (t % 8.0) / 8.0
+    lx = 0.4 + 0.5 * np.sin(2 * np.pi * phase)
+    ly = -0.4 + 0.3 * np.cos(2 * np.pi * phase)
+    prep = prepared_from_wrists(t, (lx, ly), (0.3 + 0 * t, 0.1 + 0 * t), noise=0.02)
+    prep.rel[: int(0.8 * len(t)), list(prep.names).index("right_wrist")] = np.nan  # hidden 80 % of the time
+    r = detect_cycles(prep)
+    assert r.erkannt and r.zykluszeit_median.wert == pytest.approx(8.0, rel=0.05)
