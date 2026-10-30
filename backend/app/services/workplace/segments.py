@@ -22,23 +22,14 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from . import scoring_config
 from .cycles import ZyklusErgebnis
 from .preprocess import Prepared
 
-# Type -> default class (STECKBRIEF_MODUL §4.3); the expert may change the class
-STEP_TYPES: dict[str, str] = {
-    "Fügen": "wertschoepfend",
-    "Bearbeiten": "wertschoepfend",
-    "Greifen": "notwendig",
-    "Bringen": "notwendig",
-    "Platzieren": "notwendig",
-    "Prüfen": "notwendig",
-    "Gehen": "verschwendung",
-    "Suchen": "verschwendung",
-    "Warten": "verschwendung",
-    "Umgreifen": "verschwendung",
-}
-KLASSEN = ("wertschoepfend", "notwendig", "verschwendung")
+# Type -> default class (STECKBRIEF_MODUL §4.3), from config/workplace_scoring.json;
+# the expert may change the class
+STEP_TYPES: dict[str, str] = dict(scoring_config.get().schritt_typen)
+KLASSEN = scoring_config.KLASSEN
 ARTEN = ("bewegung", "ruhe", "ortswechsel")
 
 

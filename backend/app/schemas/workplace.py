@@ -1,7 +1,7 @@
 """API models of the Steckbrief module (STECKBRIEF_MODUL §6)."""
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 Klasse = Literal["wertschoepfend", "notwendig", "verschwendung"]
 
@@ -70,3 +70,36 @@ class AblaufResponse(BaseModel):
     typen: dict[str, Klasse]
     review: Optional[ReviewGespeichert] = None
     ergebnis: Optional[AblaufErgebnisDaten] = None
+
+
+class Abmessungen(BaseModel):
+    laenge: Optional[float] = Field(default=None, gt=0, le=1000)
+    breite: Optional[float] = Field(default=None, gt=0, le=1000)
+    hoehe: Optional[float] = Field(default=None, gt=0, le=1000)
+
+
+class Kundenangaben(BaseModel):
+    """Customer inputs (STECKBRIEF_MODUL §4.5); everything optional, the
+    Steckbrief uses what is there and names what is missing."""
+
+    model_config = {"extra": "forbid"}
+
+    teilegewicht_kg: Optional[float] = Field(default=None, ge=0, le=1000)
+    abmessungen_cm: Optional[Abmessungen] = None
+    anzahl_varianten: Optional[int] = Field(default=None, ge=1, le=10000)
+    stueck_pro_schicht: Optional[int] = Field(default=None, ge=1, le=100000)
+    schichten_pro_tag: Optional[int] = Field(default=None, ge=1, le=4)
+    schichtdauer_min: Optional[int] = Field(default=None, ge=60, le=720)
+    arbeitstage_pro_jahr: Optional[int] = Field(default=None, ge=1, le=366)
+    vollkosten_euro_pro_stunde: Optional[float] = Field(default=None, gt=0, le=1000)
+    besetzung_schwierigkeit: Optional[int] = Field(default=None, ge=1, le=5)
+    # rough investment range for the automation; without it the default of the type applies
+    investition_euro: Optional[tuple[float, float]] = None
+
+    @model_validator(mode="after")
+    def _range(self):
+        if self.investition_euro is not None:
+            lo, hi = self.investition_euro
+            if not 0 < lo <= hi:
+                raise ValueError("investition_euro: von muss größer 0 und höchstens bis sein")
+        return self

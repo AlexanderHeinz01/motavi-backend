@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 ENV LIBGL_ALWAYS_SOFTWARE=1
 COPY backend/ ./backend/
+COPY config/ ./config/
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 ENV PORT=8080
 EXPOSE 8080

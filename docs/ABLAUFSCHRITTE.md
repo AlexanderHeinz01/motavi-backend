@@ -11,7 +11,7 @@ Stand: 30.10.2026. Umsetzung von `docs/STECKBRIEF_MODUL.md` Abschnitt 4.3 (Repo 
    - **Ruhe:** Die Hände bewegen sich mit weniger als 0,4 Rumpflängen pro Sekunde. Das kann Fügen, Bearbeiten, Prüfen oder Warten sein; das entscheidet der Experte.
    - **Bewegung:** alles andere. Eine Bewegung wird geteilt, wo die Hand umkehrt (Richtungswechsel ab 100°).
    - Segmente unter 0,4 s gehen im längeren Nachbarn auf.
-4. **Bewertung durch den Experten:** Typ je Segment; die Einstufung kommt aus der Tabelle und kann geändert werden.
+4. **Bewertung durch den Experten:** Typ je Segment; die Einstufung kommt aus der Tabelle und kann geändert werden. Typen und Standardeinstufung stehen in `config/workplace_scoring.json` (`schritt_typen`).
 
 | Typ | Standardeinstufung |
 |---|---|
@@ -21,7 +21,7 @@ Stand: 30.10.2026. Umsetzung von `docs/STECKBRIEF_MODUL.md` Abschnitt 4.3 (Repo 
 
 5. **Übertragung auf alle Zyklen:** Die bestätigten Segmente gelten für jeden gültigen Zyklus mit demselben Phasenanteil, gestreckt auf die Dauer des jeweiligen Zyklus. Ergebnis: Ablaufschritte mit Anteil und Dauer im Median-Zyklus, Anteile wertschöpfend, notwendig und Verschwendung, Sekunden je Zyklus und Minuten pro Schicht (Sekunden je Zyklus mal Zyklen pro Schicht).
 
-Schwellen in `SegmentConfig`; mit S4 wandern sie in `config/workplace_scoring.json`.
+Messschwellen (Ruhe, Gehen, Mindestdauer) in `SegmentConfig`, wie bei Zyklen und Greifraum direkt beim Messverfahren. In `config/workplace_scoring.json` steht alles, was bewertet: Typen und Einstufung, vermeidbare Anteile, Gewichte, Schwellen und Regeln (siehe `docs/SCORING.md`).
 
 ## API (nur Berater)
 

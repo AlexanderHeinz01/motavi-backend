@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "_kommentar": "Einzige Quelle für Gewichte, Schwellen, vermeidbare Anteile und Regeln des Arbeitsplatz-Steckbriefs (STECKBRIEF_MODUL Abschnitt 5). Startwerte, vor dem Pilotbetrieb an drei bis fünf Arbeitsplätzen gegen die Expertenbewertung nachjustieren (Abschnitt 8). Erläuterung in docs/SCORING.md.",
+
+  "schritt_typen": {
+    "_kommentar": "Ablaufschritt und Standardeinstufung (Abschnitt 4.3). Der Experte kann die Einstufung je Segment ändern.",
+    "Fügen": "wertschoepfend",
+    "Bearbeiten": "wertschoepfend",
+    "Greifen": "notwendig",
+    "Bringen": "notwendig",
+    "Platzieren": "notwendig",
+    "Prüfen": "notwendig",
+    "Gehen": "verschwendung",
+    "Suchen": "verschwendung",
+    "Warten": "verschwendung",
+    "Umgreifen": "verschwendung"
+  },
+
+  "vermeidbarer_anteil": {
+    "_kommentar": "Anteil der Zeit je Verschwendungstyp, der sich durch Gestaltung vermeiden lässt (Abschnitt 5.1). Fehlt ein Typ, gilt 0.",
+    "Suchen": 0.8,
+    "Gehen": 0.5,
+    "Warten": 0.5,
+    "Umgreifen": 0.7
+  },
+
+  "belastung": {
+    "_kommentar": "Belastungsindex 0 bis 1 aus REBA-Mittel und den Zeitanteilen Bücken, Überkopf und Drehung. Jede Kennzahl wird linear zwischen null_bei (0) und voll_bei (1) abgebildet. Fehlt eine Kennzahl, verteilt sich ihr Gewicht auf die übrigen.",
+    "teile": {
+      "reba_mittel": {"gewicht": 0.5, "null_bei": 2, "voll_bei": 9},
+      "buecken_anteil": {"gewicht": 0.2, "null_bei": 0, "voll_bei": 0.3},
+      "ueberkopf_anteil": {"gewicht": 0.2, "null_bei": 0, "voll_bei": 0.2},
+      "drehung_anteil": {"gewicht": 0.1, "null_bei": 0, "voll_bei": 0.3}
+    },
+    "min_gewicht_vorhanden": 0.5
+  },
+
+  "handhabbarkeit": {
+    "_kommentar": "Handhabbarkeitsindex 0 bis 1 aus Teilegewicht und größter Kante (Kundenangaben). Leichte, kompakte Teile lassen sich einfacher automatisiert handhaben.",
+    "teile": {
+      "teilegewicht_kg": {"gewicht": 0.6, "null_bei": 35, "voll_bei": 10},
+      "groesste_kante_cm": {"gewicht": 0.4, "null_bei": 200, "voll_bei": 60}
+    },
+    "min_gewicht_vorhanden": 0.5
+  },
+
+  "verbesserungs_score": {
+    "_kommentar": "Abschnitt 5.1. Gewichte in Summe 1. Ein Score entsteht, wenn Kriterien mit mindestens min_gewicht_vorhanden Gewicht vorliegen, sonst ist er nicht belastbar. 0.5 reicht, damit auch ein Arbeitsplatz ohne wiederkehrenden Zyklus (keine Verschwendung und Schwankung messbar) aus Greifraum und Belastung einen Score bekommt.",
+    "kriterien": {
+      "verschwendung": {"text": "Zeitanteil Verschwendung", "quelle": "gemessen und bestätigt", "kennzahl": "verschwendung_anteil", "gewicht": 0.35, "null_bei": 0, "voll_bei": 0.3},
+      "greifraum": {"text": "Griffe außerhalb des günstigen Greifraums", "quelle": "gemessen", "kennzahl": "griffe_ausserhalb", "gewicht": 0.2, "null_bei": 0, "voll_bei": 0.35},
+      "belastung": {"text": "Belastung", "quelle": "gemessen", "kennzahl": "belastung_index", "gewicht": 0.3, "null_bei": 0, "voll_bei": 1},
+      "zyklusschwankung": {"text": "Zyklusschwankung", "quelle": "gemessen", "kennzahl": "zykluszeit_vk", "gewicht": 0.15, "null_bei": 0.05, "voll_bei": 0.35}
+    },
+    "min_gewicht_vorhanden": 0.5
+  },
+
+  "automatisierungs_score": {
+    "_kommentar": "Abschnitt 5.2. Inverse Kriterien haben null_bei größer als voll_bei. ohne_zyklus: Teilwert, wenn sicher kein wiederkehrender Zyklus erkannt wurde (Abschnitt 4.1: das ist ein Ergebnis und fließt in die Empfehlung ein). Ohne diesen Eintrag fällt das Kriterium dann weg.",
+    "kriterien": {
+      "wiederholungen": {"text": "Wiederholungen pro Schicht", "quelle": "gemessen", "kennzahl": "zyklen_pro_schicht", "gewicht": 0.2, "null_bei": 60, "voll_bei": 600, "ohne_zyklus": 0},
+      "gleichfoermigkeit": {"text": "Gleichförmigkeit", "quelle": "gemessen", "kennzahl": "zykluszeit_vk", "gewicht": 0.2, "null_bei": 0.35, "voll_bei": 0.08, "ohne_zyklus": 0},
+      "varianten": {"text": "Variantenvielfalt", "quelle": "Kunde", "kennzahl": "anzahl_varianten", "gewicht": 0.15, "null_bei": 20, "voll_bei": 1},
+      "handhabbarkeit": {"text": "Teilegewicht und Handhabbarkeit", "quelle": "Kunde", "kennzahl": "handhabbarkeit_index", "gewicht": 0.1, "null_bei": 0, "voll_bei": 1},
+      "belastung": {"text": "Belastung", "quelle": "gemessen", "kennzahl": "belastung_index", "gewicht": 0.15, "null_bei": 0, "voll_bei": 1},
+      "zeitanteil_zyklen": {"text": "Zeitanteil in Zyklen", "quelle": "gemessen", "kennzahl": "zeitanteil_in_zyklen", "gewicht": 0.1, "null_bei": 0.4, "voll_bei": 0.9, "ohne_zyklus": 0},
+      "stellenbesetzung": {"text": "Schwierigkeit der Stellenbesetzung", "quelle": "Kunde", "kennzahl": "besetzung_schwierigkeit", "gewicht": 0.1, "null_bei": 1, "voll_bei": 5}
+    },
+    "min_gewicht_vorhanden": 0.6
+  },
+
+  "empfehlung": {
+    "_kommentar": "Abschnitt 5.3. Ein Score gilt als hoch ab der Schwelle (größer oder gleich). Alle vier Empfehlungen sind gleichwertige Ergebnisse.",
+    "schwelle_verbesserung": 50,
+    "schwelle_automatisierung": 60,
+    "regeln": [
+      {"verbesserung": "hoch", "automatisierung": "hoch", "empfehlung": "improve-then-automate"},
+      {"verbesserung": "hoch", "automatisierung": "niedrig", "empfehlung": "improve"},
+      {"verbesserung": "niedrig", "automatisierung": "hoch", "empfehlung": "automate"},
+      {"verbesserung": "niedrig", "automatisierung": "niedrig", "empfehlung": "keep"}
+    ],
+    "texte": {
+      "improve-then-automate": "Erst verbessern, dann automatisieren",
+      "improve": "Verbessern",
+      "automate": "Automatisieren",
+      "keep": "Beibehalten"
+    },
+    "mit_automatisierung": ["improve-then-automate", "automate"]
+  },
+
+  "vorrang": {
+    "_kommentar": "Zusatzregel aus Abschnitt 5.3: unabhängig von der Empfehlung als vorrangig markieren.",
+    "reba_mittel_ab": 8,
+    "text": "Vorrangig: hohe körperliche Belastung"
+  },
+
+  "automatisierungstypen": {
+    "_kommentar": "Abschnitt 5.4. Regeln in dieser Reihenfolge prüfen; ein Typ passt, wenn alle Bedingungen erfüllt sind. Vorschlag ist der erste passende Typ. anteil_typen: Summe der Zeitanteile dieser Ablaufschritte im Zyklus. automatisierbarer_anteil und investition_euro sind grobe Standardbandbreiten, solange der Kunde keine Investition angibt.",
+    "regeln": [
+      {
+        "id": "palettieren",
+        "name": "Palettieren",
+        "bedingungen": [
+          {"kennzahl": "teilegewicht_kg", "ab": 8},
+          {"anteil_typen": ["Greifen", "Bringen", "Platzieren"], "ab": 0.3},
+          {"kennzahl": "zone_knie_bis_schulter", "ab": 0.7}
+        ],
+        "automatisierbarer_anteil": [0.7, 0.9],
+        "investition_euro": [120000, 250000]
+      },
+      {
+        "id": "maschinenbeladung",
+        "name": "Maschinenbeladung",
+        "bedingungen": [
+          {"anteil_typen": ["Gehen"], "ab": 0.05},
+          {"anteil_typen": ["Warten"], "ab": 0.1}
+        ],
+        "automatisierbarer_anteil": [0.6, 0.85],
+        "investition_euro": [80000, 180000]
+      },
+      {
+        "id": "pruefautomatisierung",
+        "name": "Prüfautomatisierung oder Assistenzsystem",
+        "bedingungen": [
+          {"anteil_typen": ["Prüfen"], "ab": 0.25}
+        ],
+        "automatisierbarer_anteil": [0.4, 0.7],
+        "investition_euro": [30000, 100000]
+      },
+      {
+        "id": "pick_and_place",
+        "name": "Pick and Place",
+        "bedingungen": [
+          {"anteil_typen": ["Greifen", "Bringen", "Platzieren"], "ab": 0.4},
+          {"kennzahl": "zykluszeit_vk", "bis": 0.2}
+        ],
+        "automatisierbarer_anteil": [0.6, 0.85],
+        "investition_euro": [60000, 120000]
+      }
+    ],
+    "kein_typ": "Kein Typ eindeutig: Ablauf passt zu keiner Regel, Experte legt den Typ fest."
+  },
+
+  "kundenangaben": {
+    "_kommentar": "Plausibilitätsprüfung Stück pro Schicht gegen die gemessenen Zyklen (Abschnitt 4.5): Hinweis ab dieser relativen Abweichung.",
+    "plausibilitaet_toleranz": 0.25
+  },
+
+  "wirtschaftlichkeit": {
+    "hinweis": "Grobe Abschätzung, ersetzt kein Angebot."
+  }
+}

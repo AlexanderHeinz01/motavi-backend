@@ -14,7 +14,7 @@ Das Originalvideo zeigt Mitarbeitende erkennbar. Es wird nur so lange gespeicher
 | Anonymisiertes Video | `results/{job_id}/video_anon.mp4` | Kopfbereich geschwärzt | 30 Tage | Lifecycle-Regel |
 | Einzelbilder kritischer Momente | `results/{job_id}/frames/*.jpg` | aus dem anonymisierten Video | 30 Tage | Lifecycle-Regel |
 | Pose-Daten | `results/{job_id}/pose.npz` | nur Koordinaten, ohne Augen und Mund | 30 Tage | Lifecycle-Regel |
-| Ergebnisse | `results/{job_id}/*.json` (`result.json`, künftig `workplace.json`, `inputs.json`, `review.json`) | Kennzahlen, Angaben zum Arbeitsplatz | 365 Tage | Lifecycle-Regel |
+| Ergebnisse | `results/{job_id}/*.json` (`result.json`, `workplace.json`, `inputs.json`, `review.json`) | Kennzahlen, Angaben zum Arbeitsplatz | 365 Tage | Lifecycle-Regel |
 
 Die Frist zählt ab dem Speichern des Objekts. Google Cloud Storage führt Lifecycle-Regeln mit Verzögerung aus, meist innerhalb eines Tages nach Ablauf der Frist. Ein Originalvideo, dessen Löschung im Code fehlschlägt, ist also spätestens nach etwa zwei Tagen weg.
 
