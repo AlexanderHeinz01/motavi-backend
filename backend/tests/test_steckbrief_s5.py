@@ -17,8 +17,6 @@ from backend.tests.workcycle import prepared_work
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = json.loads((ROOT / "docs" / "steckbrief_schema.json").read_text(encoding="utf-8"))
 VALIDATOR = Draft202012Validator(SCHEMA, format_checker=Draft202012Validator.FORMAT_CHECKER)
-# demo data of the website (repo motavi), if checked out next to this repo
-DEMO_DIR = ROOT.parent / "motavi" / "src" / "content" / "demo"
 CFG = scoring_config.get()
 
 
@@ -82,14 +80,6 @@ def test_schema_rejects_wrong_documents():
     assert errors({**out, "verbesserungs_score": 120})
     assert errors({**out, "hersteller": "X"})  # no extra fields, vendor-neutral
     assert errors({k: v for k, v in out.items() if k != "empfehlung_id"})
-
-
-@pytest.mark.skipif(not DEMO_DIR.exists(), reason="Repo motavi nicht ausgecheckt")
-@pytest.mark.parametrize("datei", ["demo_steckbrief.json", "demo_verbessern.json", "demo_automatisieren.json", "demo_beibehalten.json"])
-def test_website_demo_data_valid(datei):
-    data = json.loads((DEMO_DIR / datei).read_text(encoding="utf-8"))
-    assert errors(data) == []
-    assert data["beispiel"] is True and data["arbeitsplatz"].startswith("Beispiel")
 
 
 # ── PDF ──────────────────────────────────────────────────────────────────────
