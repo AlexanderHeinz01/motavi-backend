@@ -1,9 +1,11 @@
-"""4-page ergonomics report: every text style readable on the page background."""
+"""4-page ergonomics report: print layout on white, readable colours, German numbers."""
 import json
+import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from reportlab import rl_config
 
 from backend.app.services import pdf
 
@@ -21,22 +23,31 @@ def contrast(a, b) -> float:
     return (la + 0.05) / (lb + 0.05)
 
 
-def test_every_page_gets_the_dark_background():
+def test_pages_are_white():
     canvas = MagicMock()
     pdf._footer(canvas, MagicMock(page=1))
     canvas.setFillColor.assert_any_call(pdf._PAGE_BG)
-    x, y, w, h = canvas.rect.call_args_list[0].args
-    assert (x, y, w, h) == (0, 0, pdf._PAGE_W, pdf._PAGE_H)
-    assert canvas.rect.call_args_list[0].kwargs == {"stroke": 0, "fill": 1}
+    assert pdf._PAGE_BG == pdf.colors.white
 
 
-@pytest.mark.parametrize("name", ["title", "subtitle", "meta_key", "meta_val", "section", "body", "critical_hdr", "medium_hdr"])
-def test_text_styles_readable_on_background(name):
-    # WCAG AA for normal text: 4.5:1 (was white on white before the background)
+@pytest.mark.parametrize("name", list(pdf._styles()))
+def test_text_styles_readable_on_white(name):
+    # WCAG AA for normal text: 4.5:1 (the report was white on white once)
     assert contrast(pdf._styles()[name].textColor, pdf._PAGE_BG) >= 4.5
 
 
-def test_report_has_four_pages():
-    import re
+@pytest.mark.parametrize("farbe", [pdf._RED, pdf._AMBER, pdf._GREEN])
+def test_traffic_light_readable_on_white(farbe):
+    assert contrast(farbe, pdf._PAGE_BG) >= 4.5
+
+
+def test_german_number_format():
+    assert pdf._de(7.64) == "7,6" and pdf._de(46.2) == "46,2" and pdf._de(1234.5, 0) == "1.234"
+
+
+def test_report_has_four_pages_and_decimal_commas(monkeypatch):
+    monkeypatch.setattr(rl_config, "pageCompression", 0)
     data = pdf.generate_report_pdf(RESULT)
     assert len(re.findall(rb"/Type /Page[^s]", data)) == 4
+    assert b"(7,6)" in data and b"46,2 %" in data  # REBA score and overhead share
+    assert b"(7.6)" not in data and b"46.2 %" not in data

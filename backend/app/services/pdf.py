@@ -5,16 +5,19 @@ Structure
 Page 1  Cover         Workplace, date, REBA-Score (large, traffic-light colour)
 Page 2  Movements     Table: %, min/shift, 8 h extrapolation
 Page 3  Body regions  Table: REBA subscore + traffic-light indicator
-Page 4  Action fields CRITICAL (red border) then MEDIUM (yellow border)
+Page 4  Action fields CRITICAL (red bar) then MEDIUM (amber bar)
 Footer  (every page)  "Erstellt durch Motavi · DSGVO-konform · EU-Server (europe-west3)"
+
+Print-friendly data sheet on white, like the 2-page Steckbrief
+(workplace/pdf_steckbrief.py), German number format (decimal comma).
 """
 import io
 from datetime import datetime
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_RIGHT
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import (
     HRFlowable,
@@ -26,32 +29,39 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-# ── Brand colours ─────────────────────────────────────────────────────────────
-_ACCENT   = colors.HexColor("#e63946")
-_DATA     = colors.HexColor("#00b4d8")
-_NEUTRAL  = colors.HexColor("#f4f4f6")
-_DARK     = colors.HexColor("#1a2744")
-_DARKEST  = colors.HexColor("#0f1830")
-_LINE     = colors.HexColor("#1a2744")
-_GREEN    = colors.HexColor("#22c55e")
-_YELLOW   = colors.HexColor("#eab308")
-_GREY_TXT = colors.HexColor("#888899")
-# Page background: the report is designed dark (light text, dark tables);
-# without it title, meta values and notes were white on white.
-_PAGE_BG  = colors.HexColor("#0a0f1e")
+# ── Colours (same palette as the Steckbrief PDF) ──────────────────────────────
+_INK      = colors.HexColor("#1a2744")
+_MUTED    = colors.HexColor("#5b6478")
+_LINE     = colors.HexColor("#d9dde5")
+_SUBTLE   = colors.HexColor("#f2f4f7")
+_DATA     = colors.HexColor("#0077b6")
+# traffic light, dark enough for white paper (at least 4.5:1)
+_RED      = colors.HexColor("#c8102e")
+_AMBER    = colors.HexColor("#a15c00")
+_GREEN    = colors.HexColor("#15803d")
+_PAGE_BG  = colors.white
 
 _PAGE_W, _PAGE_H = A4
-_CONTENT_W = _PAGE_W - 4 * cm  # left+right margin = 2 cm each
+_MARGIN = 2 * cm
+_FRAME_PAD = 6  # reportlab's default frame padding
+_CONTENT_W = _PAGE_W - 2 * _MARGIN - 2 * _FRAME_PAD
+_SEITEN = 4
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _de(x: float, nd: int = 1) -> str:
+    """German number format: decimal comma, dot for thousands."""
+    s = f"{x:,.{nd}f}"
+    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
 
 def _reba_colour(score: float) -> colors.HexColor:
     if score <= 4:
         return _GREEN
     if score <= 6:
-        return _YELLOW
-    return _ACCENT
+        return _AMBER
+    return _RED
 
 
 def _region_colour(normalised: float) -> colors.HexColor:
@@ -60,101 +70,75 @@ def _region_colour(normalised: float) -> colors.HexColor:
 
 
 def _footer(canvas, doc):
-    """Page background and footer; called when a page begins, before its content."""
+    """Footer of every page; called when a page begins, before its content."""
     canvas.saveState()
     canvas.setFillColor(_PAGE_BG)
     canvas.rect(0, 0, _PAGE_W, _PAGE_H, stroke=0, fill=1)
+    x0, x1 = _MARGIN + _FRAME_PAD, _PAGE_W - _MARGIN - _FRAME_PAD
     canvas.setStrokeColor(_LINE)
-    canvas.setLineWidth(0.4)
-    canvas.line(2 * cm, 1.5 * cm, _PAGE_W - 2 * cm, 1.5 * cm)
+    canvas.setLineWidth(0.5)
+    canvas.line(x0, 1.5 * cm, x1, 1.5 * cm)
     canvas.setFont("Helvetica", 7.5)
-    canvas.setFillColor(_GREY_TXT)
-    canvas.drawCentredString(
-        _PAGE_W / 2, 1.1 * cm,
-        "Erstellt durch Motavi · DSGVO-konform · EU-Server (europe-west3)",
-    )
-    canvas.drawRightString(_PAGE_W - 2 * cm, 1.1 * cm, f"Seite {doc.page}")
+    canvas.setFillColor(_MUTED)
+    canvas.drawString(x0, 1.1 * cm, "Erstellt durch Motavi · DSGVO-konform · EU-Server (europe-west3)")
+    canvas.drawRightString(x1, 1.1 * cm, f"Seite {doc.page} von {_SEITEN}")
     canvas.restoreState()
 
 
 # ── Style factory ─────────────────────────────────────────────────────────────
 
 def _styles():
-    base = getSampleStyleSheet()
-
     def mk(name, **kw):
-        return ParagraphStyle(name, parent=base["Normal"], **kw)
+        base = dict(fontName="Helvetica", fontSize=9.5, leading=13, textColor=_INK)
+        base.update(kw)
+        return ParagraphStyle(name, **base)
 
     return {
-        "title": mk(
-            "MTitle",
-            fontName="Helvetica-Bold", fontSize=32, leading=38,
-            textColor=colors.white, alignment=TA_CENTER, spaceAfter=4,
-        ),
-        "subtitle": mk(
-            "MSub",
-            fontName="Helvetica", fontSize=13,
-            textColor=_NEUTRAL, alignment=TA_CENTER, spaceAfter=6,
-        ),
-        "meta_key": mk(
-            "MMetaK",
-            fontName="Helvetica-Bold", fontSize=10,
-            textColor=_DATA,
-        ),
-        "meta_val": mk(
-            "MMetaV",
-            fontName="Helvetica", fontSize=10,
-            textColor=_NEUTRAL,
-        ),
-        "section": mk(
-            "MSection",
-            fontName="Helvetica-Bold", fontSize=13,
-            textColor=_DATA, spaceBefore=10, spaceAfter=6,
-        ),
-        "body": mk(
-            "MBody",
-            fontName="Helvetica", fontSize=9.5,
-            textColor=_NEUTRAL, spaceAfter=4,
-        ),
-        "note": mk(
-            "MNote",
-            fontName="Helvetica-Oblique", fontSize=8,
-            textColor=_GREY_TXT, alignment=TA_CENTER, spaceAfter=4,
-        ),
-        "critical_hdr": mk(
-            "MCritHdr",
-            fontName="Helvetica-Bold", fontSize=11,
-            textColor=_ACCENT, spaceBefore=10, spaceAfter=5,
-        ),
-        "medium_hdr": mk(
-            "MMedHdr",
-            fontName="Helvetica-Bold", fontSize=11,
-            textColor=_YELLOW, spaceBefore=10, spaceAfter=5,
-        ),
-        "disclaimer": mk(
-            "MDisc",
-            fontName="Helvetica-Oblique", fontSize=7.5,
-            textColor=_GREY_TXT, alignment=TA_CENTER,
-        ),
+        "kicker": mk("MKicker", fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=_MUTED),
+        "title": mk("MTitle", fontName="Helvetica-Bold", fontSize=24, leading=29, spaceAfter=2),
+        "subtitle": mk("MSub", fontSize=10, leading=13, textColor=_MUTED),
+        "meta_key": mk("MMetaK", fontName="Helvetica-Bold", fontSize=9.5, textColor=_MUTED),
+        "meta_val": mk("MMetaV", fontSize=9.5),
+        "section": mk("MSection", fontName="Helvetica-Bold", fontSize=14, leading=18, spaceBefore=4, spaceAfter=6),
+        "body": mk("MBody", spaceAfter=4),
+        "note": mk("MNote", fontSize=8, leading=11, textColor=_MUTED),
+        "cell": mk("MCell", fontSize=9.5),
+        "cell_r": mk("MCellR", fontSize=9.5, alignment=TA_RIGHT),
+        "head": mk("MHead", fontName="Helvetica-Bold", fontSize=9, textColor=_INK),
+        "head_r": mk("MHeadR", fontName="Helvetica-Bold", fontSize=9, textColor=_INK, alignment=TA_RIGHT),
+        "critical_hdr": mk("MCritHdr", fontName="Helvetica-Bold", fontSize=11, leading=14, textColor=_RED, spaceBefore=10, spaceAfter=5),
+        "medium_hdr": mk("MMedHdr", fontName="Helvetica-Bold", fontSize=11, leading=14, textColor=_AMBER, spaceBefore=10, spaceAfter=5),
+        "disclaimer": mk("MDisc", fontSize=8, leading=11, textColor=_MUTED),
     }
 
 
-# ── Table style helper ────────────────────────────────────────────────────────
+# ── Table helper ──────────────────────────────────────────────────────────────
 
-def _base_table_style(header_bg=_DARK):
-    return TableStyle([
-        ("BACKGROUND",    (0, 0), (-1, 0),  header_bg),
-        ("TEXTCOLOR",     (0, 0), (-1, 0),  _DATA),
-        ("FONTNAME",      (0, 0), (-1, 0),  "Helvetica-Bold"),
-        ("FONTSIZE",      (0, 0), (-1, -1), 9.5),
-        ("FONTNAME",      (0, 1), (-1, -1), "Helvetica"),
-        ("TEXTCOLOR",     (0, 1), (-1, -1), _NEUTRAL),
-        ("ALIGN",         (1, 0), (-1, -1), "CENTER"),
-        ("ROWBACKGROUNDS",(0, 1), (-1, -1), [_DARKEST, colors.HexColor("#111828")]),
-        ("GRID",          (0, 0), (-1, -1), 0.25, _LINE),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ("TOPPADDING",    (0, 0), (-1, -1), 7),
-    ])
+def _table(rows: list[list[str]], widths: list[float], S: dict, extra: list | None = None) -> Table:
+    """Data-sheet table: bold head with a dark rule, light row lines, numbers right-aligned."""
+    data = []
+    for i, row in enumerate(rows):
+        cells = []
+        for j, c in enumerate(row):
+            if i == 0:
+                st = S["head_r"] if j else S["head"]
+            else:
+                st = S["cell_r"] if j else S["cell"]
+            cells.append(c if isinstance(c, Paragraph) else Paragraph(str(c), st))
+        data.append(cells)
+    t = Table(data, colWidths=widths)
+    style = [
+        ("LINEBELOW", (0, 0), (-1, 0), 1, _INK),
+        ("LINEBELOW", (0, 1), (-1, -1), 0.4, _LINE),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, _SUBTLE]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+    ]
+    t.setStyle(TableStyle(style + (extra or [])))
+    return t
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -165,10 +149,12 @@ def generate_report_pdf(result: dict) -> bytes:
     doc = SimpleDocTemplate(
         buf,
         pagesize=A4,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        topMargin=2.5 * cm,
-        bottomMargin=2.5 * cm,
+        leftMargin=_MARGIN,
+        rightMargin=_MARGIN,
+        topMargin=2 * cm,
+        bottomMargin=2.2 * cm,
+        title="Motavi Ergonomie-Analysebericht",
+        author="Motavi",
     )
     S = _styles()
     story = []
@@ -177,64 +163,75 @@ def generate_report_pdf(result: dict) -> bytes:
     reba_level = result.get("reba_level", "UNKNOWN")
     job_id     = result.get("job_id", "")
     shift_min  = int(result.get("shift_duration_min", 480))
-    now_str    = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now_str    = datetime.now().strftime("%d.%m.%Y, %H:%M Uhr")
     reba_col   = _reba_colour(reba_score)
+    arbeitsplatz = " · ".join(result[k] for k in ("department", "task_description") if result.get(k))
 
     _level_label = {
-        "LOW":       "NIEDRIG — Geringes Risiko",
-        "MEDIUM":    "MITTEL — Ergonomische Maßnahmen empfohlen",
-        "HIGH":      "HOCH — Korrekturmaßnahmen erforderlich",
-        "VERY_HIGH": "SEHR HOCH — Sofortiger Handlungsbedarf",
+        "LOW":       "Niedrig: geringes Risiko",
+        "MEDIUM":    "Mittel: ergonomische Maßnahmen empfohlen",
+        "HIGH":      "Hoch: Korrekturmaßnahmen erforderlich",
+        "VERY_HIGH": "Sehr hoch: sofortiger Handlungsbedarf",
     }
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Page 1 — Cover
+    # Page 1: cover
     # ──────────────────────────────────────────────────────────────────────────
-    story.append(Spacer(1, 1.8 * cm))
-    story.append(Paragraph("MOTAVI", S["title"]))
-    story.append(Paragraph("Ergonomie-Analysebericht", S["subtitle"]))
+    story.append(Paragraph("MOTAVI · ERGONOMIE-ANALYSEBERICHT", S["kicker"]))
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(arbeitsplatz or "Ergonomie-Analyse", S["title"]))
     story.append(Spacer(1, 0.3 * cm))
-    story.append(HRFlowable(width=_CONTENT_W, color=_DATA, thickness=1))
-    story.append(Spacer(1, 0.8 * cm))
+    story.append(HRFlowable(width=_CONTENT_W, color=_INK, thickness=1))
+    story.append(Spacer(1, 0.4 * cm))
 
     meta_rows = [
-        [Paragraph("Analyse-ID:",    S["meta_key"]), Paragraph(job_id[:8] + "…", S["meta_val"])],
-        [Paragraph("Erstellt:",      S["meta_key"]), Paragraph(now_str,           S["meta_val"])],
-        [Paragraph("Schichtdauer:",  S["meta_key"]), Paragraph(f"{shift_min} min",S["meta_val"])],
+        [Paragraph("Analyse-ID", S["meta_key"]), Paragraph(job_id[:8], S["meta_val"])],
+        [Paragraph("Erstellt", S["meta_key"]), Paragraph(now_str, S["meta_val"])],
+        [Paragraph("Analysierte Dauer", S["meta_key"]), Paragraph(f"{shift_min} min", S["meta_val"])],
     ]
     meta_tbl = Table(meta_rows, colWidths=[4.5 * cm, _CONTENT_W - 4.5 * cm])
     meta_tbl.setStyle(TableStyle([
+        ("LINEBELOW", (0, 0), (-1, -1), 0.4, _LINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
     ]))
     story.append(meta_tbl)
-    story.append(Spacer(1, 1.2 * cm))
+    story.append(Spacer(1, 1.4 * cm))
 
-    # Big REBA score
-    score_style = ParagraphStyle(
-        "BigScore", parent=getSampleStyleSheet()["Normal"],
-        fontName="Helvetica-Bold", fontSize=80,
-        textColor=reba_col, alignment=TA_CENTER, leading=90,
+    # REBA score block with a bar in the traffic-light colour
+    score_style = ParagraphStyle("BigScore", fontName="Helvetica-Bold", fontSize=72, leading=78, textColor=reba_col)
+    level_style = ParagraphStyle("LvlStyle", fontName="Helvetica-Bold", fontSize=14, leading=18, textColor=reba_col)
+    block = Table(
+        [[[
+            Paragraph("REBA-SCORE (MITTELWERT)", S["kicker"]),
+            Spacer(1, 6),
+            Paragraph(_de(reba_score), score_style),
+            Spacer(1, 4),
+            Paragraph(_level_label.get(reba_level, reba_level), level_style),
+            Spacer(1, 8),
+            Paragraph("REBA (Rapid Entire Body Assessment) bewertet die Körperhaltung von 1 bis 15. "
+                      "Stufen dieses Berichts: bis 4 niedrig, bis 6 mittel, bis 8 hoch, darüber sehr hoch.", S["note"]),
+        ]]],
+        colWidths=[_CONTENT_W],
     )
-    level_style = ParagraphStyle(
-        "LvlStyle", parent=getSampleStyleSheet()["Normal"],
-        fontName="Helvetica-Bold", fontSize=15,
-        textColor=reba_col, alignment=TA_CENTER, spaceAfter=8,
-    )
-    story.append(Paragraph("REBA-SCORE", S["subtitle"]))
-    story.append(Paragraph(str(round(reba_score, 1)), score_style))
-    story.append(Paragraph(_level_label.get(reba_level, reba_level), level_style))
-    story.append(Spacer(1, 0.4 * cm))
-    story.append(HRFlowable(width=_CONTENT_W, color=_LINE, thickness=0.4))
+    block.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), _SUBTLE),
+        ("LINEBEFORE", (0, 0), (0, -1), 5, reba_col),
+        ("LEFTPADDING", (0, 0), (-1, -1), 18),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+        ("TOPPADDING", (0, 0), (-1, -1), 16),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
+    ]))
+    story.append(block)
 
     story.append(PageBreak())
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Page 2 — Movement breakdown
+    # Page 2: movement breakdown
     # ──────────────────────────────────────────────────────────────────────────
     story.append(Paragraph("Bewegungsanteile", S["section"]))
-    story.append(HRFlowable(width=_CONTENT_W, color=_DATA, thickness=0.5))
-    story.append(Spacer(1, 0.4 * cm))
+    story.append(Spacer(1, 0.2 * cm))
 
     movements = result.get("movements", {})
     _move_labels = {
@@ -242,36 +239,29 @@ def generate_report_pdf(result: dict) -> bytes:
         "overhead": "Überkopfarbeit",
         "neutral":  "Schulter neutral",
     }
-    move_rows = [["Bewegungsklasse", "Anteil (%)", "Min. / Schicht", "Hochrechnung 8 h"]]
+    move_rows = [["Bewegungsklasse", "Anteil", "Minuten pro Schicht", "Hochrechnung 8 h"]]
     for key, label in _move_labels.items():
         mv      = movements.get(key, {})
         pct     = mv.get("pct", 0)
         mins    = mv.get("minutes", 0)
         extrap  = round(pct / 100 * 480, 0)
-        move_rows.append([label, f"{pct:.1f} %", f"{mins:.0f} min", f"{extrap:.0f} min"])
+        move_rows.append([label, f"{_de(pct)} %", f"{_de(mins, 0)} min", f"{_de(extrap, 0)} min"])
 
     cw = _CONTENT_W
-    move_tbl = Table(
-        move_rows,
-        colWidths=[cw * 0.38, cw * 0.18, cw * 0.22, cw * 0.22],
-    )
-    move_tbl.setStyle(_base_table_style())
-    story.append(move_tbl)
+    story.append(_table(move_rows, [cw * 0.38, cw * 0.18, cw * 0.22, cw * 0.22], S))
     story.append(Spacer(1, 0.4 * cm))
     story.append(Paragraph(
-        f"Hochrechnung auf 8-Stunden-Standardschicht. "
-        f"Analysierte Dauer: {shift_min} Minuten.",
-        S["body"],
+        f"Hochrechnung auf eine 8-Stunden-Schicht. Analysierte Dauer: {shift_min} Minuten.",
+        S["note"],
     ))
 
     story.append(PageBreak())
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Page 3 — Body region subscores
+    # Page 3: body region subscores
     # ──────────────────────────────────────────────────────────────────────────
-    story.append(Paragraph("Körperregionen — REBA-Subscores", S["section"]))
-    story.append(HRFlowable(width=_CONTENT_W, color=_DATA, thickness=0.5))
-    story.append(Spacer(1, 0.4 * cm))
+    story.append(Paragraph("Körperregionen: REBA-Subscores", S["section"]))
+    story.append(Spacer(1, 0.2 * cm))
 
     body_regions = result.get("body_regions", {})
     _region_labels = {
@@ -287,9 +277,8 @@ def generate_report_pdf(result: dict) -> bytes:
         "lumbar": 8.0, "shoulder_l": 7.2, "shoulder_r": 8.0,
         "neck": 6.5,   "knee_l": 6.175,   "knee_r": 6.5, "forearm": 4.5,
     }
-    _risk_label = {True: ("Gering", _GREEN), False: ("Mittel/Hoch", _ACCENT)}
 
-    reg_rows  = [["Körperregion", "Subscore (1–10)", "Risikostufe"]]
+    reg_rows  = [["Körperregion", "Subscore (1 bis 10)", "Risikostufe"]]
     reg_style_overrides = []
 
     for row_i, (key, label) in enumerate(_region_labels.items(), start=1):
@@ -304,94 +293,73 @@ def generate_report_pdf(result: dict) -> bytes:
         else:
             risk_txt = "Hoch"
 
-        reg_rows.append([label, f"{norm:.1f}", risk_txt])
-        reg_style_overrides += [
-            ("TEXTCOLOR", (2, row_i), (2, row_i), rc),
-            ("FONTNAME",  (2, row_i), (2, row_i), "Helvetica-Bold"),
-        ]
+        reg_rows.append([
+            label, _de(norm),
+            Paragraph(f'<font color="{rc.hexval().replace("0x", "#")}"><b>{risk_txt}</b></font>', S["cell_r"]),
+        ])
+        reg_style_overrides.append(("LINEAFTER", (2, row_i), (2, row_i), 3, rc))
 
-    reg_tbl = Table(
-        reg_rows,
-        colWidths=[_CONTENT_W * 0.50, _CONTENT_W * 0.28, _CONTENT_W * 0.22],
-    )
-    ts = _base_table_style()
-    for cmd in reg_style_overrides:
-        ts.add(*cmd)
-    reg_tbl.setStyle(ts)
-    story.append(reg_tbl)
+    story.append(_table(reg_rows, [_CONTENT_W * 0.50, _CONTENT_W * 0.28, _CONTENT_W * 0.22], S, reg_style_overrides))
     story.append(Spacer(1, 0.4 * cm))
     story.append(Paragraph(
-        "Subscores normiert auf REBA-Skala 1–10.  "
-        "Ampel: Gering ≤ 4 | Mittel 5–6 | Hoch ≥ 7.",
-        S["body"],
+        "Subscores normiert auf die REBA-Skala 1 bis 10. Ampel: gering bis 4, mittel über 4 bis 6, hoch über 6.",
+        S["note"],
     ))
 
     story.append(PageBreak())
 
     # ──────────────────────────────────────────────────────────────────────────
-    # Page 4 — Action fields
+    # Page 4: action fields
     # ──────────────────────────────────────────────────────────────────────────
-    story.append(Paragraph("Handlungsfelder & Maßnahmen", S["section"]))
-    story.append(HRFlowable(width=_CONTENT_W, color=_DATA, thickness=0.5))
-    story.append(Spacer(1, 0.4 * cm))
+    story.append(Paragraph("Handlungsfelder und Maßnahmen", S["section"]))
+    story.append(Spacer(1, 0.2 * cm))
 
     action_items = result.get("action_items", [])
     critical = [a for a in action_items if a.get("priority") == "CRITICAL"]
     medium   = [a for a in action_items if a.get("priority") == "MEDIUM"]
 
-    def _action_block(items, hdr_text, hdr_style, border_col):
+    def _action_block(items, hdr_text, hdr_style, bar_col):
         if not items:
             return
         story.append(Paragraph(hdr_text, hdr_style))
         for item in items:
-            region    = item.get("region", "—")
+            region    = item.get("region", "")
             text      = item.get("text", "")
             reduction = item.get("reduction_pct")
-            red_str   = f"−{reduction} %" if reduction else "—"
+            red_str   = f"−{reduction}\u00a0%" if reduction else ""
 
-            region_p = Paragraph(
-                f"<b>{region}</b>",
-                ParagraphStyle("AR", parent=getSampleStyleSheet()["Normal"],
-                               fontName="Helvetica-Bold", fontSize=9.5, textColor=border_col),
-            )
-            text_p = Paragraph(
-                text,
-                ParagraphStyle("AT", parent=getSampleStyleSheet()["Normal"],
-                               fontName="Helvetica", fontSize=9.5, textColor=_NEUTRAL),
-            )
-            red_p = Paragraph(
-                red_str,
-                ParagraphStyle("AP", parent=getSampleStyleSheet()["Normal"],
-                               fontName="Helvetica-Bold", fontSize=9.5,
-                               textColor=_GREEN, alignment=TA_CENTER),
-            )
             t = Table(
-                [[region_p, text_p, red_p]],
+                [[
+                    Paragraph(f"<b>{region}</b>", S["cell"]),
+                    Paragraph(text, S["cell"]),
+                    Paragraph(f'<font color="{_GREEN.hexval().replace("0x", "#")}"><b>{red_str}</b></font>', S["cell_r"]),
+                ]],
                 colWidths=[3.9 * cm, _CONTENT_W - 6.7 * cm, 2.8 * cm],  # "Lendenwirbelsäule" in one line
             )
             t.setStyle(TableStyle([
-                ("VALIGN",       (0, 0), (-1, -1), "TOP"),
-                ("BACKGROUND",   (0, 0), (-1, -1), _DARKEST),
-                ("LEFTPADDING",  (0, 0), (0, -1),  8),
-                ("RIGHTPADDING", (-1, 0), (-1, -1), 8),
-                ("LINEAFTER",    (0, 0), (0, -1),  2, border_col),
-                ("BOTTOMPADDING",(0, 0), (-1, -1), 10),
-                ("TOPPADDING",   (0, 0), (-1, -1), 10),
+                ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+                ("BACKGROUND",    (0, 0), (-1, -1), _SUBTLE),
+                ("LINEBEFORE",    (0, 0), (0, -1), 4, bar_col),
+                ("LEFTPADDING",   (0, 0), (0, -1), 10),
+                ("RIGHTPADDING",  (-1, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                ("TOPPADDING",    (0, 0), (-1, -1), 9),
             ]))
             story.append(t)
             story.append(Spacer(1, 0.15 * cm))
 
     if not critical and not medium:
         story.append(Paragraph(
-            "Keine kritischen Handlungsfelder. Ergonomische Situation ist zufriedenstellend.",
+            "Keine kritischen Handlungsfelder. Die ergonomische Situation ist zufriedenstellend.",
             S["body"],
         ))
     else:
-        _action_block(critical, "KRITISCH — Sofortiger Handlungsbedarf", S["critical_hdr"], _ACCENT)
-        _action_block(medium,   "MITTEL — Empfohlene Maßnahmen",          S["medium_hdr"],   _YELLOW)
+        _action_block(critical, "Kritisch: sofortiger Handlungsbedarf", S["critical_hdr"], _RED)
+        _action_block(medium,   "Mittel: empfohlene Maßnahmen",        S["medium_hdr"],   _AMBER)
+        story.append(Paragraph("Rechts: mögliche Senkung der Belastung in dieser Körperregion.", S["note"]))
 
     story.append(Spacer(1, 0.8 * cm))
-    story.append(HRFlowable(width=_CONTENT_W, color=_LINE, thickness=0.4))
+    story.append(HRFlowable(width=_CONTENT_W, color=_LINE, thickness=0.5))
     story.append(Spacer(1, 0.3 * cm))
     story.append(Paragraph(
         "Dieser Bericht wurde automatisch durch die Motavi Ergonomie-KI erstellt. "
