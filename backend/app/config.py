@@ -31,6 +31,20 @@ class Settings(BaseSettings):
     # Empty disables registration entirely.
     SETUP_KEY: str = ""
 
+    # ── Contact form of the website (POST /api/v1/contact, docs/KONTAKT.md) ──
+    # Requests per client IP within the window
+    CONTACT_RATE_LIMIT: int = 5
+    CONTACT_RATE_WINDOW_S: int = 600
+    # Requests are deleted after this many days (Firestore TTL on loeschen_am)
+    CONTACT_RETENTION_DAYS: int = 365
+    # Optional e-mail notification; empty SMTP_HOST disables it
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    CONTACT_NOTIFY_TO: str = ""
+
     # ── Steckbrief module ───────────────────────────────────────────────────
     # Keep per-frame pose data (results/{job_id}/pose.npz, docs/POSE_DATEN.md)
     WORKPLACE_POSE_RECORDING: bool = True
