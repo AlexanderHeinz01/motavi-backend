@@ -135,12 +135,17 @@ class TypRegel(_Model):
     bedingungen: list[Bedingung] = Field(min_length=1)
     automatisierbarer_anteil: tuple[float, float]
     investition_euro: tuple[float, float]
+    # share of the saved labour cost that running the system costs again (maintenance, energy, programming)
+    betriebskosten_anteil: tuple[float, float]
 
     @model_validator(mode="after")
     def _ranges(self):
         lo, hi = self.automatisierbarer_anteil
         if not 0 < lo <= hi <= 1:
             raise ValueError(f"{self.id}: automatisierbarer_anteil muss 0 < von <= bis <= 1 sein")
+        lo, hi = self.betriebskosten_anteil
+        if not 0 <= lo <= hi < 1:
+            raise ValueError(f"{self.id}: betriebskosten_anteil muss 0 <= von <= bis < 1 sein")
         if not 0 < self.investition_euro[0] <= self.investition_euro[1]:
             raise ValueError(f"{self.id}: investition_euro muss 0 < von <= bis sein")
         return self

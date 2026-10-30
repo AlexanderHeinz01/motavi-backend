@@ -49,8 +49,9 @@ min_verbesserung       = Summe je Verschwendungstyp (Zeitanteil × mittlere Zykl
 euro_verbesserung_jahr = min_verbesserung × Schichten pro Tag × Arbeitstage / 60 × Vollkosten pro Stunde
 
 stunden_auto_jahr = Zykluszeit × Zyklen pro Schicht × Schichten pro Tag × Arbeitstage / 3600 × automatisierbarer Anteil
-euro_auto_jahr    = stunden_auto_jahr × Vollkosten pro Stunde
-amortisation      = Investition / euro_auto_jahr, als Bandbreite (kleinste Investition / größte Ersparnis bis größte Investition / kleinste Ersparnis)
+euro_auto_brutto  = stunden_auto_jahr × Vollkosten pro Stunde
+euro_auto_netto   = euro_auto_brutto × (1 − Betriebskostenanteil des Typs)
+amortisation      = Investition / euro_auto_netto, als Bandbreite (kleinste Investition / größte Ersparnis bis größte Investition / kleinste Ersparnis)
 ```
 
 - Verschwendung ist, was der Experte als Verschwendung eingestuft hat. Stuft er z.B. Prüfen als Verschwendung ein, zählt es in die Minuten, ist aber ohne Eintrag in `vermeidbarer_anteil` nicht vermeidbar.
@@ -58,7 +59,7 @@ amortisation      = Investition / euro_auto_jahr, als Bandbreite (kleinste Inves
 - Investition: Kundenangabe, sonst Standardbandbreite des Typs.
 - Fehlende Kundenangaben werden genannt; Minuten gibt es auch ohne Euro.
 - Pflichthinweis: „Grobe Abschätzung, ersetzt kein Angebot.“
-- Die Ersparnis der Automatisierung enthält keine Betriebs-, Wartungs- oder Programmierkosten. Die Amortisation fällt dadurch eher zu kurz aus.
+- **Betriebskosten:** Wartung, Energie, Programmierung und Betreuung der Anlage kosten einen Teil der eingesparten Personalkosten wieder. Je Typ steht dafür `betriebskosten_anteil` als Bandbreite in der Konfiguration (Pick and Place und Maschinenbeladung 15 bis 25 %, Palettieren 10 bis 20 %, Prüfautomatisierung 20 bis 35 %; Annahmen). Die vorsichtige Grenze kombiniert die kleine Ersparnis mit dem hohen Anteil, die günstige Grenze umgekehrt. Ausgegeben werden Brutto, Betriebskosten und Netto; die Amortisation rechnet mit Netto. Bei der Verbesserung gibt es keinen Abzug, sie ist organisatorisch.
 
 ## Kundenangaben (Abschnitt 4.5)
 

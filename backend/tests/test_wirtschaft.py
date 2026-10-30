@@ -43,10 +43,26 @@ def test_automate_current_process():
     stunden = 40 * 600 * 2 * 220 / 3600  # 2933.3 h in cycles per year
     assert a["basis"] == "aktueller Ablauf" and a["zykluszeit_basis_s"] == 40.0 and a["vermeidbar_s"] == 0
     assert a["stunden_jahr"] == [round(stunden * 0.6, 1), round(stunden * 0.85, 1)]
-    assert a["euro_jahr"] == [round(stunden * 0.6 * 50), round(stunden * 0.85 * 50)]
-    # default investment of the type: 60,000 to 120,000 euro
+    brutto = (stunden * 0.6 * 50, stunden * 0.85 * 50)
+    assert a["euro_jahr_brutto"] == [round(brutto[0]), round(brutto[1])]
+    # running costs of pick and place: 15 to 25 % of the gross savings
+    assert a["betriebskosten_anteil"] == [0.15, 0.25]
+    assert a["betriebskosten_euro_jahr"] == [round(brutto[0] * 0.15), round(brutto[1] * 0.25)]
+    netto = (brutto[0] * 0.75, brutto[1] * 0.85)
+    assert a["euro_jahr_netto"] == [round(netto[0]), round(netto[1])]
+    # default investment of the type: 60,000 to 120,000 euro, paid back from the net savings
     assert a["investition_euro"] == [60000, 120000] and a["investition_quelle"] == "Standardwert für Pick and Place"
-    assert a["amortisation_jahre"] == [round(60000 / (stunden * 0.85 * 50), 1), round(120000 / (stunden * 0.6 * 50), 1)]
+    assert a["amortisation_jahre"] == [round(60000 / netto[1], 1), round(120000 / netto[0], 1)]
+
+
+def test_running_costs_lengthen_payback():
+    ohne = PICK.model_copy(update={"betriebskosten_anteil": (0.0, 0.0)})
+    a0 = automatisieren(CFG, ohne, ABLAUF, (40.0, 600), BETRIEB, verbessert=False)
+    a = automatisieren(CFG, PICK, ABLAUF, (40.0, 600), BETRIEB, verbessert=False)
+    assert a0["euro_jahr_netto"] == a0["euro_jahr_brutto"] and a0["betriebskosten_euro_jahr"] == [0, 0]
+    assert a["amortisation_jahre"][0] > a0["amortisation_jahre"][0] and a["amortisation_jahre"][1] > a0["amortisation_jahre"][1]
+    # cautious bound: 1 / (1 - 0.25) times longer
+    assert a["amortisation_jahre"][1] == pytest.approx(a0["amortisation_jahre"][1] / 0.75, abs=0.1)
 
 
 def test_automate_on_the_improved_process():
@@ -70,7 +86,7 @@ def test_customer_investment_overrides_default():
 
 def test_automate_without_cost_rate_gives_hours_only():
     a = automatisieren(CFG, PICK, ABLAUF, (40.0, 600), Betrieb(2, 220), verbessert=False)
-    assert a["stunden_jahr"] is not None and a["euro_jahr"] is None and a["amortisation_jahre"] is None
+    assert a["stunden_jahr"] is not None and a["euro_jahr_netto"] is None and a["amortisation_jahre"] is None
     assert a["fehlende_angaben"] == ["Vollkosten pro Stunde"]
     a = automatisieren(CFG, PICK, ABLAUF, (40.0, 600), Betrieb(), verbessert=False)
     assert a["stunden_jahr"] is None and "Schichten pro Tag" in a["fehlende_angaben"]

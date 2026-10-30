@@ -6,8 +6,9 @@
 
     # automate
     stunden_auto_jahr = zykluszeit_s * zyklen_schicht * schichten * tage / 3600 * automatisierbarer_anteil
-    euro_auto_jahr    = stunden_auto_jahr * stundensatz
-    amortisation      = investition / euro_auto_jahr        (years, as a range)
+    euro_auto_brutto  = stunden_auto_jahr * stundensatz
+    euro_auto_netto   = euro_auto_brutto * (1 - betriebskosten_anteil)   (maintenance, energy, programming)
+    amortisation      = investition / euro_auto_netto       (years, as a range)
 
 For "Erst verbessern, dann automatisieren" the automation is computed on the
 improved process: cycle time minus the avoidable waste. The number of cycles
@@ -116,8 +117,11 @@ def automatisieren(cfg: ScoringConfig, typ: TypRegel | None, ablauf: Ablauf | No
         "automatisierbarer_anteil": [lo, hi],
         "investition_euro": [inv[0], inv[1]],
         "investition_quelle": inv_quelle,
+        "betriebskosten_anteil": [typ.betriebskosten_anteil[0], typ.betriebskosten_anteil[1]],
         "stunden_jahr": None,
-        "euro_jahr": None,
+        "euro_jahr_brutto": None,
+        "betriebskosten_euro_jahr": None,
+        "euro_jahr_netto": None,
         "amortisation_jahre": None,
         "fehlende_angaben": [],
     }
@@ -130,10 +134,15 @@ def automatisieren(cfg: ScoringConfig, typ: TypRegel | None, ablauf: Ablauf | No
     if not betrieb.stundensatz:
         out["fehlende_angaben"] = ["Vollkosten pro Stunde"]
         return out
-    euro = (stunden[0] * betrieb.stundensatz, stunden[1] * betrieb.stundensatz)
-    out["euro_jahr"] = _bereich(*euro, nd=0)
-    # fastest: low investment with high savings; slowest: high investment with low savings
-    out["amortisation_jahre"] = _bereich(inv[0] / euro[1], inv[1] / euro[0])
+    brutto = (stunden[0] * betrieb.stundensatz, stunden[1] * betrieb.stundensatz)
+    bk_lo, bk_hi = typ.betriebskosten_anteil
+    # cautious bound: low savings with high running costs; optimistic: the other way round
+    netto = (brutto[0] * (1 - bk_hi), brutto[1] * (1 - bk_lo))
+    out["euro_jahr_brutto"] = _bereich(*brutto, nd=0)
+    out["betriebskosten_euro_jahr"] = _bereich(brutto[0] * bk_lo, brutto[1] * bk_hi, nd=0)
+    out["euro_jahr_netto"] = _bereich(*netto, nd=0)
+    # fastest: low investment with high net savings; slowest: high investment with low net savings
+    out["amortisation_jahre"] = _bereich(inv[0] / netto[1], inv[1] / netto[0])
     return out
 
 

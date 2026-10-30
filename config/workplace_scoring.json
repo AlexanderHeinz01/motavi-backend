@@ -95,7 +95,7 @@
   },
 
   "automatisierungstypen": {
-    "_kommentar": "Abschnitt 5.4. Regeln in dieser Reihenfolge prüfen; ein Typ passt, wenn alle Bedingungen erfüllt sind. Vorschlag ist der erste passende Typ. anteil_typen: Summe der Zeitanteile dieser Ablaufschritte im Zyklus. automatisierbarer_anteil und investition_euro sind grobe Standardbandbreiten, solange der Kunde keine Investition angibt.",
+    "_kommentar": "Abschnitt 5.4. Regeln in dieser Reihenfolge prüfen; ein Typ passt, wenn alle Bedingungen erfüllt sind. Vorschlag ist der erste passende Typ. anteil_typen: Summe der Zeitanteile dieser Ablaufschritte im Zyklus. automatisierbarer_anteil und investition_euro sind grobe Standardbandbreiten, solange der Kunde keine Investition angibt. betriebskosten_anteil: Anteil der eingesparten Personalkosten, den Wartung, Energie, Programmierung und Betreuung der Anlage wieder kosten (Abschnitt 5.5, netto = brutto mal (1 minus Anteil)). Alle drei Bandbreiten sind Annahmen und vor dem Pilotbetrieb zu prüfen.",
     "regeln": [
       {
         "id": "palettieren",
@@ -106,7 +106,8 @@
           {"kennzahl": "zone_knie_bis_schulter", "ab": 0.7}
         ],
         "automatisierbarer_anteil": [0.7, 0.9],
-        "investition_euro": [120000, 250000]
+        "investition_euro": [120000, 250000],
+        "betriebskosten_anteil": [0.1, 0.2]
       },
       {
         "id": "maschinenbeladung",
@@ -116,7 +117,8 @@
           {"anteil_typen": ["Warten"], "ab": 0.1}
         ],
         "automatisierbarer_anteil": [0.6, 0.85],
-        "investition_euro": [80000, 180000]
+        "investition_euro": [80000, 180000],
+        "betriebskosten_anteil": [0.15, 0.25]
       },
       {
         "id": "pruefautomatisierung",
@@ -125,7 +127,8 @@
           {"anteil_typen": ["Prüfen"], "ab": 0.25}
         ],
         "automatisierbarer_anteil": [0.4, 0.7],
-        "investition_euro": [30000, 100000]
+        "investition_euro": [30000, 100000],
+        "betriebskosten_anteil": [0.2, 0.35]
       },
       {
         "id": "pick_and_place",
@@ -135,7 +138,8 @@
           {"kennzahl": "zykluszeit_vk", "bis": 0.2}
         ],
         "automatisierbarer_anteil": [0.6, 0.85],
-        "investition_euro": [60000, 120000]
+        "investition_euro": [60000, 120000],
+        "betriebskosten_anteil": [0.15, 0.25]
       }
     ],
     "kein_typ": "Kein Typ eindeutig: Ablauf passt zu keiner Regel, Experte legt den Typ fest."

@@ -45,6 +45,8 @@ def test_weights_as_in_the_plan():
     (lambda c: c["vermeidbarer_anteil"].update(Suchen=1.5), "nicht zwischen 0 und 1"),
     (lambda c: c["automatisierungstypen"]["regeln"][0]["bedingungen"][0].update(ab=None), "ab oder bis"),
     (lambda c: c["automatisierungstypen"]["regeln"][0].update(automatisierbarer_anteil=[0.9, 0.5]), "automatisierbarer_anteil"),
+    (lambda c: c["automatisierungstypen"]["regeln"][0].update(betriebskosten_anteil=[0.2, 1.0]), "betriebskosten_anteil"),
+    (lambda c: c["automatisierungstypen"]["regeln"][0].pop("betriebskosten_anteil"), "betriebskosten_anteil"),
 ])
 def test_invalid_config_is_rejected(change, message):
     raw = copy.deepcopy(RAW)
