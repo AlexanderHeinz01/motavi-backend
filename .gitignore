@@ -212,3 +212,6 @@ frontend/dist/
 frontend/.env
 frontend/.env.local
 frontend/.env.*.local
+
+# frontend helpers (the lib/ rule above is for Python packaging)
+!frontend/src/lib/
