@@ -96,6 +96,7 @@ class Empfehlung(_Model):
     schwelle_automatisierung: float = Field(ge=0, le=100)
     regeln: list[Regel]
     texte: dict[str, str]
+    erklaerung: dict[str, str]  # one sentence per recommendation (STECKBRIEF_MODUL §1)
     mit_automatisierung: list[str]
 
     @model_validator(mode="after")
@@ -103,9 +104,10 @@ class Empfehlung(_Model):
         combos = {(r.verbesserung, r.automatisierung) for r in self.regeln}
         if len(combos) != 4 or len(self.regeln) != 4:
             raise ValueError("Die Regeln müssen jede Kombination aus hoch und niedrig genau einmal abdecken")
-        missing = set(EMPFEHLUNGEN) - set(self.texte)
-        if missing:
-            raise ValueError(f"Texte fehlen für {sorted(missing)}")
+        for name, d in (("Texte", self.texte), ("Erklärungen", self.erklaerung)):
+            missing = set(EMPFEHLUNGEN) - set(d)
+            if missing:
+                raise ValueError(f"{name} fehlen für {sorted(missing)}")
         return self
 
 

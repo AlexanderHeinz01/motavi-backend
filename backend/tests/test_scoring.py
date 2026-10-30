@@ -168,7 +168,7 @@ def test_priority_threshold(reba, vorrangig):
 def test_priority_independent_of_recommendation():
     doc = build("automate", belastung=(8.5, 0.05, 0.0, 0.05))
     assert doc["empfehlung"]["id"] == "automate" and doc["empfehlung"]["vorrangig"]
-    assert "REBA-Mittel 8.5" in doc["empfehlung"]["vorrang_grund"]
+    assert "REBA-Mittel 8,5" in doc["empfehlung"]["vorrang_grund"]
     assert not build("keep")["empfehlung"]["vorrangig"]
     assert scoring.vorrang(CFG, None).vorrangig is False
 

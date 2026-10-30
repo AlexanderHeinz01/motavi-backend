@@ -1,20 +1,27 @@
 """Steckbrief module API (STECKBRIEF_MODUL §4.3 to §6).
 
-GET  /workplace/{job_id}         Steckbrief: scores, recommendation, type, economics (signed in)
-PUT  /workplace/{job_id}/inputs  customer inputs (signed in)
-GET  /workplace/{job_id}/ablauf  proposal in the median cycle, saved review, result (consultants)
-PUT  /workplace/{job_id}/review  confirm or correct the steps; transferred to all cycles (consultants)
+GET  /workplace/{job_id}            Steckbrief: scores, recommendation, type, economics (signed in)
+PUT  /workplace/{job_id}/inputs     customer inputs (signed in)
+GET  /workplace/{job_id}/pdf        PDF Steckbrief, 2 pages (signed in)
+GET  /workplace/{job_id}/export     JSON export, docs/steckbrief_schema.json (signed in)
+GET  /workplace/{job_id}/ablauf     proposal in the median cycle, saved review, result (consultants)
+PUT  /workplace/{job_id}/review     confirm or correct the steps; transferred to all cycles (consultants)
+PUT  /workplace/{job_id}/empfehlung confirm or change recommendation and type (consultants)
 
 Consultants: role "berater" or "admin".
 """
+import io
+import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response, StreamingResponse
 
 from ..config import settings
 from ..schemas.workplace import (
     AblaufErgebnisDaten,
     AblaufResponse,
+    EmpfehlungBestaetigung,
     Kundenangaben,
     MedianZyklusDaten,
     ReviewGespeichert,
@@ -23,7 +30,7 @@ from ..schemas.workplace import (
     ZyklenInfo,
 )
 from ..services import gcs
-from ..services.workplace import scoring_config, steckbrief
+from ..services.workplace import export, pdf_steckbrief, scoring_config, steckbrief
 from ..services.workplace.belastung import analyse_belastung
 from ..services.workplace.cycles import detect_cycles
 from ..services.workplace.pose_store import load_npz
@@ -148,16 +155,32 @@ async def put_review(job_id: str, body: ReviewRequest, user: dict = Depends(requ
     return _response(job_id, zyklen, median, vorschlag, review)
 
 
-def _steckbrief(job_id: str, kunde: dict | None = None) -> dict:
+def _arbeitsplatz(result: dict) -> str | None:
+    """Name of the workplace from the upload form (no person)."""
+    teile = [result.get(k) for k in ("department", "task_description") if result.get(k)]
+    return " · ".join(teile) or None
+
+
+def _ergebnisse(job_id: str, kunde: dict | None = None) -> dict:
+    """Module results of the job: keyword arguments for steckbrief.build."""
     prep, zyklen, result, kunde = _load(job_id, kunde)
     review = gcs.get_json(_path(job_id, "review.json"))
     schritte = _schritte(review) if zyklen.erkannt else None
-    ablauf = transfer(schritte, zyklen) if schritte else None
-    doc = steckbrief.build(
-        scoring_config.get(), job_id, zyklen, analyse_reach(prep), schritte, ablauf,
-        analyse_belastung(result, prep, zyklen), kunde, review,
+    return dict(
+        zyklen=zyklen, greifraum=analyse_reach(prep), schritte=schritte,
+        ablauf=transfer(schritte, zyklen) if schritte else None,
+        belastung=analyse_belastung(result, prep, zyklen), kunde=kunde, review=review,
+        arbeitsplatz=_arbeitsplatz(result),
     )
-    gcs.put_json(_path(job_id, "workplace.json"), doc)
+
+
+def _steckbrief(job_id: str, kunde: dict | None = None, bestaetigung: dict | None = None, speichern: bool = True) -> dict:
+    """bestaetigung: use this instead of the saved one (None: saved one)."""
+    if bestaetigung is None:
+        bestaetigung = gcs.get_json(_path(job_id, "empfehlung.json"))
+    doc = steckbrief.build(scoring_config.get(), job_id, **_ergebnisse(job_id, kunde), bestaetigung=bestaetigung or None)
+    if speichern:
+        gcs.put_json(_path(job_id, "workplace.json"), doc)
     return doc
 
 
@@ -174,3 +197,53 @@ async def put_inputs(job_id: str, body: Kundenangaben, user: dict = Depends(get_
     doc = _steckbrief(job_id, kunde)  # 404 without pose data, before anything is saved
     gcs.put_json(_path(job_id, "inputs.json"), kunde)
     return doc
+
+
+@router.put("/workplace/{job_id}/empfehlung")
+async def put_empfehlung(job_id: str, body: EmpfehlungBestaetigung, user: dict = Depends(require_berater)) -> dict:
+    """The expert confirms or changes recommendation and automation type (§5.3, §5.4, §6.4)."""
+    cfg = scoring_config.get()
+    mit_auto = body.empfehlung_id in cfg.empfehlung.mit_automatisierung
+    if body.typ_id is not None:
+        if not mit_auto:
+            raise HTTPException(status_code=422, detail="Ein Automatisierungstyp gehört nur zu einer Empfehlung mit Automatisierung.")
+        if steckbrief.typ_regel(cfg, body.typ_id) is None:
+            raise HTTPException(status_code=422, detail=f"Unbekannter Automatisierungstyp {body.typ_id!r}.")
+    # the current proposal, so that a later change of it can be pointed out
+    vorschlag = _steckbrief(job_id, bestaetigung={}, speichern=False)
+    bestaetigung = {
+        "empfehlung_id": body.empfehlung_id,
+        "typ_id": body.typ_id,
+        "kommentar": body.kommentar,
+        "vorschlag_id": vorschlag["empfehlung"]["vorschlag_id"],
+        "vorschlag_typ_id": vorschlag["automatisierungstyp"]["vorschlag_id"],
+        "bestaetigt_von": user["email"],
+        "bestaetigt_am": datetime.now(timezone.utc).isoformat(),
+    }
+    gcs.put_json(_path(job_id, "empfehlung.json"), bestaetigung)
+    return _steckbrief(job_id, bestaetigung=bestaetigung)
+
+
+def _dateiname(doc: dict, endung: str) -> str:
+    return f"motavi-steckbrief-{doc['job_id'][:8]}.{endung}"
+
+
+@router.get("/workplace/{job_id}/pdf")
+async def get_pdf(job_id: str, user: dict = Depends(get_current_user)) -> StreamingResponse:
+    doc = _steckbrief(job_id)
+    e = scoring_config.get().empfehlung
+    data = pdf_steckbrief.generate(doc, (e.schwelle_verbesserung, e.schwelle_automatisierung))
+    return StreamingResponse(
+        io.BytesIO(data), media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{_dateiname(doc, "pdf")}"'},
+    )
+
+
+@router.get("/workplace/{job_id}/export")
+async def get_export(job_id: str, user: dict = Depends(get_current_user)) -> Response:
+    doc = _steckbrief(job_id)
+    body = json.dumps(export.to_export(doc), ensure_ascii=False, indent=2)
+    return Response(
+        body, media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{_dateiname(doc, "json")}"'},
+    )

@@ -103,3 +103,14 @@ class Kundenangaben(BaseModel):
             if not 0 < lo <= hi:
                 raise ValueError("investition_euro: von muss größer 0 und höchstens bis sein")
         return self
+
+
+class EmpfehlungBestaetigung(BaseModel):
+    """The expert's decision on recommendation and type (STECKBRIEF_MODUL §6.4)."""
+
+    model_config = {"extra": "forbid"}
+
+    empfehlung_id: Literal["improve-then-automate", "improve", "automate", "keep"]
+    # only with a recommendation with automation; None: type left open
+    typ_id: Optional[str] = None
+    kommentar: Optional[str] = Field(default=None, max_length=2000)

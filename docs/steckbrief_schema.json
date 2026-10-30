@@ -1,0 +1,635 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://motavi.de/schema/steckbrief-1.0.json",
+  "title": "Motavi Arbeitsplatz-Steckbrief",
+  "description": "Herstellerneutrales Exportformat des Arbeitsplatz-Steckbriefs (STECKBRIEF_MODUL Abschnitt 6.3, Version 1.0). Die Pflichtfelder entsprechen dem Demo-Format aus Abschnitt 7. Nicht belastbar messbare Werte sind null, der Grund steht in qualitaet. Anteile als Zahl von 0 bis 1. Keine Personendaten.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "schema_version",
+    "beispiel",
+    "arbeitsplatz",
+    "empfehlung_id",
+    "empfehlung",
+    "vorrangig",
+    "verbesserungs_score",
+    "automatisierungs_score",
+    "zykluszeit_median_s",
+    "zykluszeit_vk",
+    "zyklen_pro_schicht",
+    "zeitanteil_in_zyklen",
+    "anteile_ablauf",
+    "ablaufschritte",
+    "hoehenzonen",
+    "griffe_ausserhalb_greifraum",
+    "reba_mittel",
+    "drehungen_pro_zyklus",
+    "verbesserung_min_schicht",
+    "typ_vorschlag",
+    "stunden_auto_jahr_bandbreite"
+  ],
+  "properties": {
+    "format": {
+      "const": "motavi-arbeitsplatz-steckbrief"
+    },
+    "schema_version": {
+      "const": "1.0"
+    },
+    "beispiel": {
+      "type": "boolean",
+      "description": "true: erfundene Beispielwerte (Demo), keine Messung"
+    },
+    "erstellt_am": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "job_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "arbeitsplatz": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Bezeichnung des Arbeitsplatzes, keine Person"
+    },
+    "empfehlung_id": {
+      "enum": [
+        "improve-then-automate",
+        "improve",
+        "automate",
+        "keep",
+        null
+      ],
+      "description": "null: keine Empfehlung, weil ein Score nicht belastbar ist"
+    },
+    "empfehlung": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "empfehlung_status": {
+      "enum": [
+        "vorschlag",
+        "bestaetigt"
+      ]
+    },
+    "empfehlung_vorschlag_id": {
+      "enum": [
+        "improve-then-automate",
+        "improve",
+        "automate",
+        "keep",
+        null
+      ],
+      "description": "Vorschlag des Tools; weicht von empfehlung_id ab, wenn der Experte geändert hat"
+    },
+    "gruende": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 3
+    },
+    "vorrangig": {
+      "type": "boolean"
+    },
+    "vorrang_grund": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "verbesserungs_score": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "automatisierungs_score": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "zyklus_erkannt": {
+      "type": "boolean"
+    },
+    "zyklus_hinweis": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "anzahl_zyklen": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "zykluszeit_median_s": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "exclusiveMinimum": 0
+    },
+    "zykluszeit_vk": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "zyklen_pro_schicht": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "zeitanteil_in_zyklen": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "ablauf_bestaetigt": {
+      "type": "boolean"
+    },
+    "anteile_ablauf": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "wertschoepfend",
+            "notwendig",
+            "verschwendung"
+          ],
+          "properties": {
+            "wertschoepfend": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "notwendig": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "verschwendung": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ablaufschritte": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "typ",
+          "anteil",
+          "klasse"
+        ],
+        "properties": {
+          "typ": {
+            "enum": [
+              "Fügen",
+              "Bearbeiten",
+              "Greifen",
+              "Bringen",
+              "Platzieren",
+              "Prüfen",
+              "Gehen",
+              "Suchen",
+              "Warten",
+              "Umgreifen"
+            ]
+          },
+          "anteil": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "klasse": {
+            "enum": [
+              "wertschoepfend",
+              "notwendig",
+              "verschwendung"
+            ]
+          }
+        }
+      }
+    },
+    "hoehenzonen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unter_knie",
+        "knie_huefte",
+        "huefte_schulter",
+        "ueber_schulter"
+      ],
+      "properties": {
+        "unter_knie": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "knie_huefte": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "huefte_schulter": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "ueber_schulter": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "griffe_ausserhalb_greifraum": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reba_mittel": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 15
+    },
+    "reba_max": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 15
+    },
+    "buecken_anteil": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "ueberkopf_anteil": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "drehung_anteil": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "drehungen_pro_zyklus": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "verschwendung_min_schicht": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "verbesserung_min_schicht": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "verbesserung_euro_jahr": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "typ_id": {
+      "enum": [
+        "palettieren",
+        "maschinenbeladung",
+        "pruefautomatisierung",
+        "pick_and_place",
+        null
+      ]
+    },
+    "typ_vorschlag": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Automatisierungstyp, kein Hersteller"
+    },
+    "stunden_auto_jahr_bandbreite": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "automatisierung": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "basis",
+            "zykluszeit_basis_s",
+            "automatisierbarer_anteil",
+            "investition_euro",
+            "investition_quelle",
+            "betriebskosten_anteil"
+          ],
+          "properties": {
+            "basis": {
+              "enum": [
+                "aktueller Ablauf",
+                "verbesserter Ablauf"
+              ]
+            },
+            "zykluszeit_aktuell_s": {
+              "type": "number"
+            },
+            "zykluszeit_basis_s": {
+              "type": "number"
+            },
+            "automatisierbarer_anteil": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "investition_euro": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "investition_quelle": {
+              "type": "string"
+            },
+            "betriebskosten_anteil": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "stunden_jahr": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "euro_jahr_brutto": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "euro_jahr_netto": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "amortisation_jahre": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "kundenangaben": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "teilegewicht_kg": {
+          "type": "number"
+        },
+        "abmessungen_cm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "laenge": {
+              "type": "number"
+            },
+            "breite": {
+              "type": "number"
+            },
+            "hoehe": {
+              "type": "number"
+            }
+          }
+        },
+        "anzahl_varianten": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "stueck_pro_schicht": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "schichten_pro_tag": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "schichtdauer_min": {
+          "type": "integer"
+        },
+        "arbeitstage_pro_jahr": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 366
+        },
+        "vollkosten_euro_pro_stunde": {
+          "type": "number"
+        },
+        "besetzung_schwierigkeit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "investition_euro": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "qualitaet": {
+      "type": "object",
+      "description": "Je Kennzahl: belastbar, Qualität 0 bis 1, Grund wenn nicht belastbar",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "belastbar",
+          "qualitaet"
+        ],
+        "properties": {
+          "belastbar": {
+            "type": "boolean"
+          },
+          "qualitaet": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "pilotphase": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Kennzahlen ohne abgeschlossene Validierung (Abschnitt 8)"
+    },
+    "hinweise": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pflichthinweis": {
+      "type": "string"
+    },
+    "konfiguration_version": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    }
+  }
+}

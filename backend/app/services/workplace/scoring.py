@@ -174,7 +174,8 @@ def vorrang(cfg: ScoringConfig, reba_mittel: float | None) -> VorrangErgebnis:
     """Priority regardless of the recommendation (§5.3 additional rule)."""
     s = cfg.vorrang.reba_mittel_ab
     if reba_mittel is not None and reba_mittel >= s:
-        return VorrangErgebnis(True, cfg.vorrang.text, f"REBA-Mittel {reba_mittel:.1f} ab {s:g}")
+        wert = f"{reba_mittel:.1f}".replace(".", ",")
+        return VorrangErgebnis(True, cfg.vorrang.text, f"REBA-Mittel {wert} ab {s:g}")
     return VorrangErgebnis(False, None, None)
 
 

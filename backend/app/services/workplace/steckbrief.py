@@ -7,8 +7,9 @@ results/{job_id}/workplace.json.
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime, timezone
 
-from . import scoring
+from . import scoring, texte
 from .belastung import BelastungErgebnis
 from .cycles import KEIN_ZYKLUS, ZyklusErgebnis
 from .quality import Kennzahl
@@ -109,9 +110,16 @@ def _score_dict(s: scoring.ScoreErgebnis) -> dict:
     }
 
 
+def typ_regel(cfg: ScoringConfig, typ_id: str | None):
+    return next((r for r in cfg.automatisierungstypen.regeln if r.id == typ_id), None)
+
+
 def build(cfg: ScoringConfig, job_id: str, zyklen: ZyklusErgebnis, greifraum: GreifraumErgebnis | None,
           schritte: list[BewerteterSchritt] | None, ablauf: AblaufErgebnis | None, belastung: BelastungErgebnis,
-          kunde: dict | None, review: dict | None = None) -> dict:
+          kunde: dict | None, review: dict | None = None, bestaetigung: dict | None = None,
+          arbeitsplatz: str | None = None, jetzt: datetime | None = None) -> dict:
+    """bestaetigung: the expert's confirmation of recommendation and type
+    (empfehlung.json); it replaces the proposal, which stays visible."""
     kunde = kunde or {}
     werte = kennzahlen(cfg, zyklen, greifraum, ablauf, belastung, kunde)
     kein_zyklus = not zyklen.erkannt and zyklen.hinweis == KEIN_ZYKLUS
@@ -122,10 +130,29 @@ def build(cfg: ScoringConfig, job_id: str, zyklen: ZyklusErgebnis, greifraum: Gr
 
     anteile = typ_anteile(schritte) if schritte else None
     typ = scoring.automatisierungstyp(cfg, werte, anteile)
-    if emp.mit_automatisierung:
-        typ_regel, typ_text = typ.vorschlag, typ.text
+    vorschlag_typ = typ.vorschlag if emp.mit_automatisierung else None
+
+    # the expert's decision counts; the proposal stays visible
+    hinweise = []
+    if bestaetigung:
+        emp_id = bestaetigung["empfehlung_id"]
+        regel = typ_regel(cfg, bestaetigung.get("typ_id"))
+        status = "bestaetigt"
+        if bestaetigung.get("vorschlag_id") != emp.id or bestaetigung.get("vorschlag_typ_id") != (vorschlag_typ.id if vorschlag_typ else None):
+            hinweise.append("Der Vorschlag hat sich seit der Bestätigung geändert (neue Messung, Ablaufschritte oder Angaben). Bitte Empfehlung erneut prüfen.")
     else:
-        typ_regel, typ_text = None, "Nur bei einer Empfehlung mit Automatisierung."
+        emp_id, regel, status = emp.id, vorschlag_typ, "vorschlag"
+    mit_auto = emp_id in cfg.empfehlung.mit_automatisierung
+    if not mit_auto:
+        regel = None
+    if regel:
+        typ_text = regel.name
+    elif not mit_auto:
+        typ_text = "Nur bei einer Empfehlung mit Automatisierung."
+    elif bestaetigung:
+        typ_text = "Typ vom Experten offen gelassen."
+    else:
+        typ_text = typ.text
 
     ablauf_w = None
     if ablauf and schritte:
@@ -143,10 +170,9 @@ def build(cfg: ScoringConfig, job_id: str, zyklen: ZyklusErgebnis, greifraum: Gr
         stundensatz=kunde.get("vollkosten_euro_pro_stunde"),
         investition_euro=tuple(inv) if inv else None,
     )
-    wirt = wirtschaftlichkeit(cfg, emp.id, typ_regel, ablauf_w,
+    wirt = wirtschaftlichkeit(cfg, emp_id, regel, ablauf_w,
                               (_w(zyklen.zykluszeit_median), _w(zyklen.zyklen_pro_schicht)), betrieb)
 
-    hinweise = []
     if not schritte:
         hinweise.append("Ablaufschritte noch nicht vom Experten bestätigt: Verschwendung fehlt im Verbesserungs-Score.")
     p = plausibilitaet(cfg, _w(zyklen.zyklen_pro_schicht), kunde.get("stueck_pro_schicht"))
@@ -154,17 +180,42 @@ def build(cfg: ScoringConfig, job_id: str, zyklen: ZyklusErgebnis, greifraum: Gr
         hinweise.append(p)
     hinweise.append(belastung.hinweis)
 
+    b = bestaetigung or {}
     return {
         "job_id": job_id,
+        "arbeitsplatz": arbeitsplatz or f"Arbeitsplatz {job_id[:8]}",
+        "erstellt_am": (jetzt or datetime.now(timezone.utc)).isoformat(timespec="seconds"),
         "konfiguration_version": cfg.version,
-        "empfehlung": {**asdict(emp), "vorrangig": vor.vorrangig, "vorrang_text": vor.text, "vorrang_grund": vor.grund},
+        "empfehlung": {
+            "id": emp_id,
+            "text": cfg.empfehlung.texte[emp_id] if emp_id else emp.text,
+            "erklaerung": cfg.empfehlung.erklaerung.get(emp_id) if emp_id else None,
+            "status": status,
+            "vorlaeufig": emp.vorlaeufig and not bestaetigung,
+            "mit_automatisierung": mit_auto,
+            "gruende": texte.gruende(emp_id, v, a, werte),
+            "begruendung": emp.begruendung,
+            "vorschlag_id": emp.id,
+            "vorschlag_text": emp.text,
+            "geaendert": bool(bestaetigung) and emp_id != emp.id,
+            "bestaetigt_von": b.get("bestaetigt_von"),
+            "bestaetigt_am": b.get("bestaetigt_am"),
+            "kommentar": b.get("kommentar"),
+            "vorrangig": vor.vorrangig,
+            "vorrang_text": vor.text,
+            "vorrang_grund": vor.grund,
+        },
         "verbesserungs_score": _score_dict(v),
         "automatisierungs_score": _score_dict(a),
         "automatisierungstyp": {
-            "vorschlag": typ_regel.name if typ_regel else None,
-            "id": typ_regel.id if typ_regel else None,
+            "id": regel.id if regel else None,
+            "name": regel.name if regel else None,
             "text": typ_text,
-            "regeln": [asdict(r) for r in typ.regeln] if emp.mit_automatisierung else [],
+            "status": status if regel or bestaetigung else "vorschlag",
+            "vorschlag_id": vorschlag_typ.id if vorschlag_typ else None,
+            "vorschlag": vorschlag_typ.name if vorschlag_typ else None,
+            "geaendert": bool(bestaetigung) and (regel.id if regel else None) != (vorschlag_typ.id if vorschlag_typ else None),
+            "regeln": [asdict(r) for r in typ.regeln] if mit_auto else [],
         },
         "zyklen": {
             "erkannt": zyklen.erkannt,

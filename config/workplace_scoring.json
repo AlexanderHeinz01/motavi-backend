@@ -85,6 +85,12 @@
       "automate": "Automatisieren",
       "keep": "Beibehalten"
     },
+    "erklaerung": {
+      "improve-then-automate": "Automatisierung lohnt sich, aber erst nach Bereinigung des Ablaufs. Die Wirtschaftlichkeit ist auf Basis des verbesserten Ablaufs gerechnet.",
+      "improve": "Verschwendung und Belastung lassen sich durch Gestaltung des Arbeitsplatzes lösen.",
+      "automate": "Der Ablauf ist bereits schlank, wiederholt sich oft und ist gleichförmig.",
+      "keep": "Weder Verbesserung noch Automatisierung bringen nennenswerten Nutzen."
+    },
     "mit_automatisierung": ["improve-then-automate", "automate"]
   },
 
