@@ -1,5 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { getFrameUrl, getReportPdfUrl } from '../api/motavi'
+import { BERATER_ROLLEN } from '../api/workplace'
+import { useAuth } from '../auth/AuthContext'
 import ActionItems   from '../components/ActionItems'
 import BodyHeatmap   from '../components/BodyHeatmap'
 import MovementChart from '../components/MovementChart'
@@ -34,6 +36,8 @@ export default function DashboardPage() {
   const { jobId }  = useParams<{ jobId: string }>()
   const navigate   = useNavigate()
   const { status, result, error } = useAnalysis(jobId)
+  const { user } = useAuth()
+  const berater = !!user && BERATER_ROLLEN.includes(user.role)
 
   const loading = status === 'processing'
   const failed  = status === 'error'
@@ -75,6 +79,16 @@ export default function DashboardPage() {
           )}
         </div>
 
+        <div className="flex items-center gap-3">
+        {/* Expert view, only for consultants */}
+        {result && berater && (
+          <button
+            onClick={() => navigate(`/app/experte/${result.job_id}`)}
+            className="px-4 py-2 rounded-lg bg-bg-secondary border border-neutral/10 hover:border-data/50 transition-colors font-body text-sm text-neutral/70 hover:text-white"
+          >
+            Ablauf bewerten
+          </button>
+        )}
         {/* PDF Export */}
         {result && (
           <a
@@ -91,6 +105,7 @@ export default function DashboardPage() {
             PDF-Report
           </a>
         )}
+        </div>
       </header>
 
       {/* Dashboard grid */}

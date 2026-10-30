@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
@@ -13,6 +13,8 @@ class RegisterRequest(BaseModel):
     password: str
     name: Optional[str] = None
     company: Optional[str] = None
+    # "berater" may review process steps (expert view); registration needs the setup key
+    role: Literal["user", "berater"] = "user"
 
 
 class UserPublic(BaseModel):

@@ -46,6 +46,18 @@ def get_result(job_id: str) -> Optional[dict]:
     return json.loads(blob.download_as_bytes())
 
 
+def get_json(path: str) -> Optional[dict]:
+    """Parsed JSON blob, or None if it does not exist."""
+    blob = get_bucket().blob(path)
+    if not blob.exists():
+        return None
+    return json.loads(blob.download_as_bytes())
+
+
+def put_json(path: str, data: dict) -> None:
+    _upload(path, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json")
+
+
 def blob_exists(path: str) -> bool:
     """Return True if the GCS blob exists."""
     return get_bucket().blob(path).exists()

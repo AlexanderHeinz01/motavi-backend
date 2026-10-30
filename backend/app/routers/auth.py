@@ -55,6 +55,17 @@ async def get_current_user(
     return user
 
 
+# Roles that may review process steps and confirm Steckbriefe (STECKBRIEF_MODUL §4.3)
+BERATER_ROLES = {"berater", "admin"}
+
+
+async def require_berater(user: dict = Depends(get_current_user)) -> dict:
+    """Signed-in consultant; everyone else gets 403."""
+    if user.get("role") not in BERATER_ROLES:
+        raise HTTPException(status_code=403, detail="Nur für angemeldete Berater.")
+    return user
+
+
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(body: LoginRequest) -> TokenResponse:
     _require_config()
@@ -90,6 +101,7 @@ async def register(
             auth_svc.hash_password(body.password),
             body.name,
             body.company,
+            body.role,
         )
     except HTTPException:
         raise
