@@ -22,7 +22,8 @@ of cycles, share of falsely detected cycles (a detected cycle is correct if it
 overlaps a manual cycle with an IoU of at least 0.5, one to one), share of
 missed cycles, deviation of the time share of waste (needs process steps in
 the CSV and review.json). Target of the pilot phase: median cycle time within
-±10 % of the manual measurement (§8.3). The other targets are proposals.
+±10 % of the manual measurement (§8.3). The other targets were confirmed on
+30.10.2026 (STECKBRIEF_MODUL §8).
 """
 from __future__ import annotations
 
@@ -211,10 +212,11 @@ def vergleiche(video: str, m: Manuell, zyklen: ZyklusErgebnis, ablauf: AblaufErg
 @dataclass(frozen=True)
 class Ziele:
     median: float = 0.10  # STECKBRIEF_MODUL §8.3
-    anzahl: float = 0.10  # proposal
-    falsch: float = 0.10  # proposal
-    verschwendung_pp: float = 5.0  # proposal
-    min_videos: int = 3  # proposal: fewer videos give no decision
+    # confirmed on 30.10.2026 (STECKBRIEF_MODUL §8)
+    anzahl: float = 0.10
+    falsch: float = 0.10
+    verschwendung_pp: float = 5.0
+    min_videos: int = 3  # fewer videos give no decision
 
 
 def _ok(x: float | None, grenze: float) -> bool:
@@ -302,9 +304,9 @@ def bericht(ergebnisse: list[VideoErgebnis], g: dict, ziele: Ziele, quelle: str,
         "| Kennzahl | Ziel | Herkunft |",
         "|---|---|---|",
         f"| Median-Zykluszeit | innerhalb ±{z(ziele.median)} % der manuellen Messung | STECKBRIEF_MODUL Abschnitt 8.3 |",
-        f"| Anzahl Zyklen | innerhalb ±{z(ziele.anzahl)} %, höchstens {z(ziele.falsch)} % falsch erkannte Zyklen | Vorschlag |",
-        f"| Zeitanteil Verschwendung | innerhalb ±{str(ziele.verschwendung_pp).replace('.', ',')} Prozentpunkte | Vorschlag |",
-        "| kein Zyklus | kein Zyklus erkannt, wo von Hand keiner gesehen wird | Vorschlag |",
+        f"| Anzahl Zyklen | innerhalb ±{z(ziele.anzahl)} %, höchstens {z(ziele.falsch)} % falsch erkannte Zyklen | Abschnitt 8, bestätigt am 30.10.2026 |",
+        f"| Zeitanteil Verschwendung | innerhalb ±{str(ziele.verschwendung_pp).replace('.', ',')} Prozentpunkte | Abschnitt 8, bestätigt am 30.10.2026 |",
+        "| kein Zyklus | kein Zyklus erkannt, wo von Hand keiner gesehen wird | Abschnitt 8, bestätigt am 30.10.2026 |",
         "",
         f"Eine Entscheidung gibt es ab {ziele.min_videos} Videos je Kennzahl, und nur wenn alle Videos im Ziel liegen.",
         "",

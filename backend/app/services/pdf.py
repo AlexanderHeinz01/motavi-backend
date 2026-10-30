@@ -36,6 +36,9 @@ _LINE     = colors.HexColor("#1a2744")
 _GREEN    = colors.HexColor("#22c55e")
 _YELLOW   = colors.HexColor("#eab308")
 _GREY_TXT = colors.HexColor("#888899")
+# Page background: the report is designed dark (light text, dark tables);
+# without it title, meta values and notes were white on white.
+_PAGE_BG  = colors.HexColor("#0a0f1e")
 
 _PAGE_W, _PAGE_H = A4
 _CONTENT_W = _PAGE_W - 4 * cm  # left+right margin = 2 cm each
@@ -57,7 +60,10 @@ def _region_colour(normalised: float) -> colors.HexColor:
 
 
 def _footer(canvas, doc):
+    """Page background and footer; called when a page begins, before its content."""
     canvas.saveState()
+    canvas.setFillColor(_PAGE_BG)
+    canvas.rect(0, 0, _PAGE_W, _PAGE_H, stroke=0, fill=1)
     canvas.setStrokeColor(_LINE)
     canvas.setLineWidth(0.4)
     canvas.line(2 * cm, 1.5 * cm, _PAGE_W - 2 * cm, 1.5 * cm)
@@ -82,7 +88,7 @@ def _styles():
     return {
         "title": mk(
             "MTitle",
-            fontName="Helvetica-Bold", fontSize=32,
+            fontName="Helvetica-Bold", fontSize=32, leading=38,
             textColor=colors.white, alignment=TA_CENTER, spaceAfter=4,
         ),
         "subtitle": mk(
@@ -361,7 +367,7 @@ def generate_report_pdf(result: dict) -> bytes:
             )
             t = Table(
                 [[region_p, text_p, red_p]],
-                colWidths=[3.2 * cm, _CONTENT_W - 6 * cm, 2.8 * cm],
+                colWidths=[3.9 * cm, _CONTENT_W - 6.7 * cm, 2.8 * cm],  # "Lendenwirbelsäule" in one line
             )
             t.setStyle(TableStyle([
                 ("VALIGN",       (0, 0), (-1, -1), "TOP"),

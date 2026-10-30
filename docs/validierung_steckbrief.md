@@ -12,9 +12,9 @@ Stand: 30.10.2026 · erzeugt mit `backend/scripts/validate_steckbrief.py` · Que
 | Kennzahl | Ziel | Herkunft |
 |---|---|---|
 | Median-Zykluszeit | innerhalb ±10 % der manuellen Messung | STECKBRIEF_MODUL Abschnitt 8.3 |
-| Anzahl Zyklen | innerhalb ±10 %, höchstens 10 % falsch erkannte Zyklen | Vorschlag |
-| Zeitanteil Verschwendung | innerhalb ±5,0 Prozentpunkte | Vorschlag |
-| kein Zyklus | kein Zyklus erkannt, wo von Hand keiner gesehen wird | Vorschlag |
+| Anzahl Zyklen | innerhalb ±10 %, höchstens 10 % falsch erkannte Zyklen | Abschnitt 8, bestätigt am 30.10.2026 |
+| Zeitanteil Verschwendung | innerhalb ±5,0 Prozentpunkte | Abschnitt 8, bestätigt am 30.10.2026 |
+| kein Zyklus | kein Zyklus erkannt, wo von Hand keiner gesehen wird | Abschnitt 8, bestätigt am 30.10.2026 |
 
 Eine Entscheidung gibt es ab 3 Videos je Kennzahl, und nur wenn alle Videos im Ziel liegen.
 
