@@ -42,7 +42,7 @@ class CycleConfig:
     min_coverage: float = 0.6  # share of frames with a person
     reliable: float = 0.5  # quality threshold for the metrics
     min_cycles_cv: int = 5  # variation coefficient needs more cycles
-    harmonic_ratio: float = 0.85  # prefer an earlier peak of at least this height
+    harmonic_ratio: float = 0.85  # prefer an earlier peak of at least this depth
 
 
 @dataclass(frozen=True)
@@ -171,10 +171,16 @@ def dominant_period(x: np.ndarray, mask: np.ndarray, rate: float, cfg: CycleConf
     peaks = peaks[(peaks >= min_lag) & (peaks <= max_lag)]
     if peaks.size == 0:
         return None, 0.0, acf, ones
-    heights = search[peaks]
-    best = float(heights.max())
-    # fundamental: the first peak that is nearly as high as the best one
-    first = peaks[np.argmax(heights >= cfg.harmonic_ratio * best)]
+    # depth of a peak: its height above the trough since the previous peak.
+    # A real cycle has a deep trough before it (and so have its multiples); a
+    # short repeated motion inside a step (e.g. screwing) on top of slow hand
+    # movement has not, although the acf at short lags is high.
+    starts = np.concatenate([[0], peaks[:-1]])
+    tiefe = np.array([search[p] - search[a : p + 1].min() for a, p in zip(starts, peaks)])
+    best = float(tiefe.max())
+    # fundamental: the first peak that is nearly as deep as the deepest one
+    # (2x, 3x of the true period look alike)
+    first = int(peaks[np.argmax(tiefe >= cfg.harmonic_ratio * best)])
     h = float(search[first])
     # parabolic refinement of the lag
     lag = float(first)
