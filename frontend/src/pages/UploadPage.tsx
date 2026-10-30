@@ -215,7 +215,7 @@ export default function UploadPage() {
 
         {/* Footer note */}
         <p className="text-center font-body text-xs text-neutral/25">
-          DSGVO-konform · Anonymisierung on-server · EU-Server (europe-west3)
+          Anonymisierung auf dem Server · Server in Deutschland (Frankfurt)
         </p>
       </div>
     </div>

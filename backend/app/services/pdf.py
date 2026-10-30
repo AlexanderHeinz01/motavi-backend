@@ -6,7 +6,7 @@ Page 1  Cover         Workplace, date, REBA-Score (large, traffic-light colour)
 Page 2  Movements     Table: %, min/shift, 8 h extrapolation
 Page 3  Body regions  Table: REBA subscore + traffic-light indicator
 Page 4  Action fields CRITICAL (red bar) then MEDIUM (amber bar)
-Footer  (every page)  "Erstellt durch Motavi · DSGVO-konform · EU-Server (europe-west3)"
+Footer  (every page)  "Erstellt durch Motavi · Server in Deutschland (Frankfurt)"
 
 Print-friendly data sheet on white, like the 2-page Steckbrief
 (workplace/pdf_steckbrief.py), German number format (decimal comma).
@@ -98,7 +98,7 @@ def _footer(canvas, doc):
     canvas.line(x0, 1.5 * cm, x1, 1.5 * cm)
     canvas.setFont("Helvetica", 7.5)
     canvas.setFillColor(_MUTED)
-    canvas.drawString(x0, 1.1 * cm, "Erstellt durch Motavi · DSGVO-konform · EU-Server (europe-west3)")
+    canvas.drawString(x0, 1.1 * cm, "Erstellt durch Motavi · Server in Deutschland (Frankfurt)")
     canvas.drawRightString(x1, 1.1 * cm, f"Seite {doc.page} von {_SEITEN}")
     canvas.restoreState()
 

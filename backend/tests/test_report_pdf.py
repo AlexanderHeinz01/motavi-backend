@@ -68,3 +68,10 @@ def test_report_uses_score_not_old_level(monkeypatch):
     data = pdf.generate_report_pdf({**RESULT, "reba_level": "HIGH"})
     assert b"(Mittel: Ma" in data  # umlauts are escaped in the PDF stream
     assert b"Korrekturma" not in data and b"(Hoch: " not in data
+
+
+def test_no_unchecked_legal_claim(monkeypatch):
+    # "DSGVO-konform" only after a legal check (decision of 30.10.2026)
+    monkeypatch.setattr(rl_config, "pageCompression", 0)
+    data = pdf.generate_report_pdf(RESULT)
+    assert b"DSGVO" not in data and b"Server in Deutschland" in data  # parentheses are escaped in the PDF

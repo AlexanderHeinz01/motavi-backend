@@ -689,7 +689,7 @@ function Trust() {
       <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80 }}>
         <div>
           <div style={{ fontFamily: 'Inter,sans-serif', fontSize: 12, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#6C3AED', marginBottom: 24 }}>● Datenschutz & Compliance</div>
-          {['Anonymisierung vor Upload (kein Personenbezug)', 'DSGVO-konform', 'Made in Germany', 'On-Premise-Betrieb möglich'].map((item) => (
+          {['Anonymisierung vor Upload (kein Personenbezug)', 'Made in Germany', 'On-Premise-Betrieb möglich'].map((item) => (
             <div key={item} style={{ display: 'flex', gap: 10, alignItems: 'center', fontFamily: 'Inter,sans-serif', fontSize: 15, color: '#1A1A1A', marginBottom: 14 }}>
               <span style={{ color: '#6C3AED', fontWeight: 700 }}>✓</span> {item}
             </div>

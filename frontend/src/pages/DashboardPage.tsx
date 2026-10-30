@@ -240,7 +240,7 @@ export default function DashboardPage() {
       {/* Footer */}
       <footer className="border-t border-bg-secondary px-6 py-4 text-center">
         <p className="font-body text-xs text-neutral/20">
-          Erstellt durch Motavi · DSGVO-konform · EU-Server (europe-west3)
+          Erstellt durch Motavi · Server in Deutschland (Frankfurt)
         </p>
       </footer>
     </div>
