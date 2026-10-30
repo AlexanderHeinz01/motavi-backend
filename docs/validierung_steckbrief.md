@@ -61,4 +61,4 @@ Das Label entfällt erst, wenn die Entscheidung im Repo umgesetzt ist (`PILOTPHA
 1. Videos mit geklärten Nutzungsrechten auswählen, möglichst verschiedene Arbeitsplätze (kurze und lange Zyklen, mit Unterbrechungen, einer ohne wiederkehrenden Zyklus).
 2. Von Hand je Video jeden vollständigen Zyklus mit Anfang und Ende in Sekunden erfassen (gleicher Bezugspunkt, z.B. Griff zum neuen Teil). Unterbrechungen nicht als Zyklus erfassen. Für die Verschwendung zusätzlich die Ablaufschritte mit Typ.
 3. Für jedes Video `pose.npz` und, falls bewertet, `review.json` aus `results/{job_id}/` laden, oder das Video selbst neben die CSV legen.
-4. `python -m backend.scripts.validate_steckbrief manuell.csv --daten DIR --out docs/validierung_steckbrief.md`
+4. `python -m backend.scripts.validate_steckbrief manuell.csv --daten DIR --out docs/validierung_steckbrief.md` (Vorlage für die CSV: `docs/validierung_vorlage.csv`)

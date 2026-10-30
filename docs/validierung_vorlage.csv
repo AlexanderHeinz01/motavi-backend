@@ -1,0 +1,11 @@
+# Vorlage für die manuelle Erfassung (S6), Auswertung mit backend/scripts/validate_steckbrief.py
+# Je Zyklus eine Zeile mit typ Zyklus; Sekunden ab Videobeginn, Dezimalpunkt.
+# Ablaufschritte optional, Typen wie in der Expertenansicht:
+# Fügen, Bearbeiten, Greifen, Bringen, Platzieren, Prüfen, Gehen, Suchen, Warten, Umgreifen
+# Video ohne wiederkehrenden Zyklus: eine Zeile mit typ "kein Zyklus" über die ganze Länge.
+video,start_s,ende_s,typ
+montage_a.mp4,12.4,50.9,Zyklus
+montage_a.mp4,50.9,89.6,Zyklus
+montage_a.mp4,12.4,17.2,Gehen
+montage_a.mp4,17.2,23.0,Greifen
+nacharbeit.mp4,0,300,kein Zyklus
