@@ -9,6 +9,7 @@ import REBAGauge     from '../components/REBAGauge'
 import SteckbriefTab from '../components/SteckbriefTab'
 import TimelineChart from '../components/TimelineChart'
 import { useAnalysis } from '../hooks/useAnalysis'
+import { rebaStufe, rebaText } from '../lib/rebaStufe'
 
 function Card({
   title, children, className = '',
@@ -145,10 +146,10 @@ export default function DashboardPage() {
             <div className="mb-6 flex flex-wrap gap-4 items-center">
               <div className="flex flex-col">
                 <span className="font-mono text-3xl font-bold"
-                  style={{ color: result.reba_score <= 4 ? '#22c55e' : result.reba_score <= 6 ? '#eab308' : '#e63946' }}>
-                  {result.reba_score.toFixed(1)}
+                  style={{ color: rebaStufe(result.reba_score).farbe }}>
+                  {rebaText(result.reba_score)}
                 </span>
-                <span className="font-body text-xs text-neutral/40">REBA-Score</span>
+                <span className="font-body text-xs text-neutral/40">REBA-Score · {rebaStufe(result.reba_score).stufe}</span>
               </div>
               <div className="h-10 w-px bg-bg-secondary" />
               <div className="flex flex-col">
@@ -170,7 +171,7 @@ export default function DashboardPage() {
 
               {/* 1 — REBA Gauge */}
               <Card title="REBA-Score">
-                <REBAGauge score={result.reba_score} level={result.reba_level} />
+                <REBAGauge score={result.reba_score} />
               </Card>
 
               {/* 2 — Body Heatmap */}
@@ -220,7 +221,7 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between">
                               <span className="font-mono text-xs text-neutral/50">{mm}:{ss}</span>
                               <span className="font-mono text-sm font-bold" style={{ color: '#e63946' }}>
-                                REBA {cf.reba.toFixed(1)}
+                                REBA {rebaText(cf.reba)}
                               </span>
                             </div>
                             <span className="font-body text-xs text-neutral/40">{mvLabel}</span>

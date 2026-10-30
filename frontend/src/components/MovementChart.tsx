@@ -30,7 +30,7 @@ export default function MovementChart({ movements, shiftMin = 480 }: Props) {
             <div
               key={key}
               style={{ width: `${pct}%`, backgroundColor: color }}
-              title={`${label}: ${pct.toFixed(1)} %`}
+              title={`${label}: ${pct.toFixed(1).replace('.', ',')}\u00a0%`}
               className="flex items-center justify-center transition-all duration-700"
             >
               {pct > 8 && (
@@ -66,7 +66,7 @@ export default function MovementChart({ movements, shiftMin = 480 }: Props) {
                 className="font-mono text-sm font-semibold w-14 text-right"
                 style={{ color }}
               >
-                {pct.toFixed(1)} %
+                {pct.toFixed(1).replace('.', ',')}&nbsp;%
               </span>
               {/* Minutes */}
               <span className="font-mono text-xs text-neutral/50 ml-auto">
