@@ -56,17 +56,35 @@ def _de(x: float, nd: int = 1) -> str:
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def _reba_colour(score: float) -> colors.HexColor:
-    if score <= 4:
-        return _GREEN
-    if score <= 6:
-        return _AMBER
-    return _RED
+# REBA action levels as on the website (motavi, src/lib/steckbrief.ts rebaStufe):
+# 1 negligible, 2 to 3 low, 4 to 7 medium, 8 to 10 high, 11 to 15 very high.
+# The report derives the level from the mean score; reba_level in result.json
+# (older bounds 4, 6, 8) stays unchanged for the pipeline and the dashboard.
+REBA_STUFEN = (
+    # (score below, level, action, colour)
+    (2.0, "Vernachlässigbar", "keine Maßnahmen nötig", _GREEN),
+    (4.0, "Niedrig", "Maßnahmen eventuell nötig", _GREEN),
+    (8.0, "Mittel", "Maßnahmen nötig", _AMBER),
+    (11.0, "Hoch", "Maßnahmen bald nötig", _RED),
+    (float("inf"), "Sehr hoch", "Maßnahmen sofort nötig", _RED),
+)
+
+
+def reba_stufe(score: float) -> tuple[str, str, colors.HexColor]:
+    """(level, action, colour) of a REBA score."""
+    for grenze, stufe, massnahme, farbe in REBA_STUFEN:
+        if score < grenze:
+            return stufe, massnahme, farbe
+    raise AssertionError("unreachable")
 
 
 def _region_colour(normalised: float) -> colors.HexColor:
-    """normalised is already on the 1-10 REBA scale."""
-    return _reba_colour(normalised)
+    """Traffic light of the normalised body region subscore (1 to 10 scale)."""
+    if normalised <= 4:
+        return _GREEN
+    if normalised <= 6:
+        return _AMBER
+    return _RED
 
 
 def _footer(canvas, doc):
@@ -160,19 +178,11 @@ def generate_report_pdf(result: dict) -> bytes:
     story = []
 
     reba_score = float(result.get("reba_score", 0))
-    reba_level = result.get("reba_level", "UNKNOWN")
     job_id     = result.get("job_id", "")
     shift_min  = int(result.get("shift_duration_min", 480))
     now_str    = datetime.now().strftime("%d.%m.%Y, %H:%M Uhr")
-    reba_col   = _reba_colour(reba_score)
+    stufe, massnahme, reba_col = reba_stufe(reba_score)
     arbeitsplatz = " · ".join(result[k] for k in ("department", "task_description") if result.get(k))
-
-    _level_label = {
-        "LOW":       "Niedrig: geringes Risiko",
-        "MEDIUM":    "Mittel: ergonomische Maßnahmen empfohlen",
-        "HIGH":      "Hoch: Korrekturmaßnahmen erforderlich",
-        "VERY_HIGH": "Sehr hoch: sofortiger Handlungsbedarf",
-    }
 
     # ──────────────────────────────────────────────────────────────────────────
     # Page 1: cover
@@ -208,10 +218,10 @@ def generate_report_pdf(result: dict) -> bytes:
             Spacer(1, 6),
             Paragraph(_de(reba_score), score_style),
             Spacer(1, 4),
-            Paragraph(_level_label.get(reba_level, reba_level), level_style),
+            Paragraph(f"{stufe}: {massnahme}", level_style),
             Spacer(1, 8),
             Paragraph("REBA (Rapid Entire Body Assessment) bewertet die Körperhaltung von 1 bis 15. "
-                      "Stufen dieses Berichts: bis 4 niedrig, bis 6 mittel, bis 8 hoch, darüber sehr hoch.", S["note"]),
+                      "Stufen: 1 vernachlässigbar, 2 bis 3 niedrig, 4 bis 7 mittel, 8 bis 10 hoch, ab 11 sehr hoch.", S["note"]),
         ]]],
         colWidths=[_CONTENT_W],
     )

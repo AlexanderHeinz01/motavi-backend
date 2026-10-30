@@ -51,3 +51,20 @@ def test_report_has_four_pages_and_decimal_commas(monkeypatch):
     assert len(re.findall(rb"/Type /Page[^s]", data)) == 4
     assert b"(7,6)" in data and b"46,2 %" in data  # REBA score and overhead share
     assert b"(7.6)" not in data and b"46.2 %" not in data
+
+
+@pytest.mark.parametrize("score, stufe", [
+    (1.0, "Vernachlässigbar"), (1.99, "Vernachlässigbar"), (2.0, "Niedrig"), (3.9, "Niedrig"), (4.0, "Mittel"),
+    (7.64, "Mittel"), (7.99, "Mittel"), (8.0, "Hoch"), (10.9, "Hoch"), (11.0, "Sehr hoch"), (15.0, "Sehr hoch"),
+])
+def test_reba_levels_as_on_the_website(score, stufe):
+    # bounds of rebaStufe in the motavi repo (src/lib/steckbrief.ts): below 2, 4, 8, 11
+    assert pdf.reba_stufe(score)[0] == stufe
+
+
+def test_report_uses_score_not_old_level(monkeypatch):
+    monkeypatch.setattr(rl_config, "pageCompression", 0)
+    # result.json says HIGH (old bounds); 7.6 is "mittel" on the REBA scale
+    data = pdf.generate_report_pdf({**RESULT, "reba_level": "HIGH"})
+    assert b"(Mittel: Ma" in data  # umlauts are escaped in the PDF stream
+    assert b"Korrekturma" not in data and b"(Hoch: " not in data
