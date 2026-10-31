@@ -2,11 +2,11 @@
 
 Structure
 ─────────
-Page 1  Cover         Workplace, date, REBA-Score (large, traffic-light colour)
+Page 1  Cover         Workplace, date, posture index based on REBA (large, traffic-light colour)
 Page 2  Movements     Table: %, min/shift, 8 h extrapolation
-Page 3  Body regions  Table: REBA subscore + traffic-light indicator
+Page 3  Body regions  Table: region score + traffic-light indicator
 Page 4  Action fields CRITICAL (red bar) then MEDIUM (amber bar)
-Footer  (every page)  "Erstellt durch Motavi · Server in Deutschland (Frankfurt)"
+Footer  (every page)  "Erstellt durch Motavi · Analyse auf Servern in Deutschland (Frankfurt)"
 
 Print-friendly data sheet on white, like the 2-page Steckbrief
 (workplace/pdf_steckbrief.py), German number format (decimal comma).
@@ -56,22 +56,20 @@ def _de(x: float, nd: int = 1) -> str:
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-# REBA action levels as on the website (motavi, src/lib/steckbrief.ts rebaStufe):
-# 1 negligible, 2 to 3 low, 4 to 7 medium, 8 to 10 high, 11 to 15 very high.
-# The report derives the level from the mean score; reba_level in result.json
-# (older bounds 4, 6, 8) stays unchanged for the pipeline and the dashboard.
+# Levels of the posture index based on REBA (1 to 10), the same everywhere
+# (docs/HALTUNGSINDEX.md; analyzer.stufe, website src/lib/steckbrief.ts,
+# dashboard frontend/src/lib/rebaStufe.ts).
 REBA_STUFEN = (
-    # (score below, level, action, colour)
-    (2.0, "Vernachlässigbar", "keine Maßnahmen nötig", _GREEN),
-    (4.0, "Niedrig", "Maßnahmen eventuell nötig", _GREEN),
-    (8.0, "Mittel", "Maßnahmen nötig", _AMBER),
-    (11.0, "Hoch", "Maßnahmen bald nötig", _RED),
-    (float("inf"), "Sehr hoch", "Maßnahmen sofort nötig", _RED),
+    # (index below, level, action, colour)
+    (4.0, "Niedrig", "derzeit kein Handlungsbedarf", _GREEN),
+    (6.0, "Mittel", "Gestaltung prüfen", _AMBER),
+    (8.0, "Hoch", "Gestaltung bald verbessern", _RED),
+    (float("inf"), "Sehr hoch", "Gestaltung vorrangig verbessern", _RED),
 )
 
 
 def reba_stufe(score: float) -> tuple[str, str, colors.HexColor]:
-    """(level, action, colour) of a REBA score."""
+    """(level, action, colour) of a posture index."""
     for grenze, stufe, massnahme, farbe in REBA_STUFEN:
         if score < grenze:
             return stufe, massnahme, farbe
@@ -98,7 +96,7 @@ def _footer(canvas, doc):
     canvas.line(x0, 1.5 * cm, x1, 1.5 * cm)
     canvas.setFont("Helvetica", 7.5)
     canvas.setFillColor(_MUTED)
-    canvas.drawString(x0, 1.1 * cm, "Erstellt durch Motavi · Server in Deutschland (Frankfurt)")
+    canvas.drawString(x0, 1.1 * cm, "Erstellt durch Motavi · Analyse auf Servern in Deutschland (Frankfurt)")
     canvas.drawRightString(x1, 1.1 * cm, f"Seite {doc.page} von {_SEITEN}")
     canvas.restoreState()
 
@@ -209,20 +207,22 @@ def generate_report_pdf(result: dict) -> bytes:
     story.append(meta_tbl)
     story.append(Spacer(1, 1.4 * cm))
 
-    # REBA score block with a bar in the traffic-light colour
+    # posture index block with a bar in the traffic-light colour
     score_style = ParagraphStyle("BigScore", fontName="Helvetica-Bold", fontSize=72, leading=78, textColor=reba_col)
     level_style = ParagraphStyle("LvlStyle", fontName="Helvetica-Bold", fontSize=14, leading=18, textColor=reba_col)
     block = Table(
         [[[
-            Paragraph("REBA-SCORE (MITTELWERT)", S["kicker"]),
+            Paragraph("HALTUNGSINDEX AUF REBA-BASIS (MITTELWERT, 1 BIS 10)", S["kicker"]),
             Spacer(1, 6),
             Paragraph(_de(reba_score), score_style),
             Spacer(1, 4),
             Paragraph(f"{stufe}: {massnahme}", level_style),
             Spacer(1, 8),
-            Paragraph("REBA (Rapid Entire Body Assessment) bewertet die Körperhaltung von 1 bis 15. "
-                      "Stufen: 1 vernachlässigbar, 2 bis 3 niedrig, 4 bis 7 mittel, 8 bis 10 hoch, ab 11 sehr hoch. "
-                      "Pilotphase: Die Berechnung aus dem Video ist noch nicht gegen manuelle REBA-Bewertungen geprüft.", S["note"]),
+            Paragraph("Der Haltungsindex fasst die Haltung von Rumpf, Nacken, Oberarmen, Unterarmen und Knien nach den "
+                      "Winkelbereichen von REBA (Rapid Entire Body Assessment) gewichtet zusammen, Skala 1 bis 10. "
+                      "Er ist kein REBA-Wert: Last, Griffart und Handgelenke fließen nicht ein. "
+                      "Stufen: unter 4 niedrig, 4 bis unter 6 mittel, 6 bis unter 8 hoch, ab 8 sehr hoch. "
+                      "Pilotphase: noch nicht gegen manuelle Bewertungen geprüft.", S["note"]),
         ]]],
         colWidths=[_CONTENT_W],
     )
@@ -271,7 +271,7 @@ def generate_report_pdf(result: dict) -> bytes:
     # ──────────────────────────────────────────────────────────────────────────
     # Page 3: body region subscores
     # ──────────────────────────────────────────────────────────────────────────
-    story.append(Paragraph("Körperregionen: REBA-Subscores", S["section"]))
+    story.append(Paragraph("Körperregionen", S["section"]))
     story.append(Spacer(1, 0.2 * cm))
 
     body_regions = result.get("body_regions", {})
@@ -313,7 +313,7 @@ def generate_report_pdf(result: dict) -> bytes:
     story.append(_table(reg_rows, [_CONTENT_W * 0.50, _CONTENT_W * 0.28, _CONTENT_W * 0.22], S, reg_style_overrides))
     story.append(Spacer(1, 0.4 * cm))
     story.append(Paragraph(
-        "Subscores normiert auf die REBA-Skala 1 bis 10. Ampel: gering bis 4, mittel über 4 bis 6, hoch über 6.",
+        "Werte je Körperregion auf die Skala 1 bis 10 umgerechnet. Ampel: gering bis 4, mittel über 4 bis 6, hoch über 6. Pilotphase.",
         S["note"],
     ))
 
@@ -336,16 +336,13 @@ def generate_report_pdf(result: dict) -> bytes:
         for item in items:
             region    = item.get("region", "")
             text      = item.get("text", "")
-            reduction = item.get("reduction_pct")
-            red_str   = f"−{reduction}\u00a0%" if reduction else ""
 
             t = Table(
                 [[
                     Paragraph(f"<b>{region}</b>", S["cell"]),
                     Paragraph(text, S["cell"]),
-                    Paragraph(f'<font color="{_GREEN.hexval().replace("0x", "#")}"><b>{red_str}</b></font>', S["cell_r"]),
                 ]],
-                colWidths=[3.9 * cm, _CONTENT_W - 6.7 * cm, 2.8 * cm],  # "Lendenwirbelsäule" in one line
+                colWidths=[3.9 * cm, _CONTENT_W - 3.9 * cm],  # "Lendenwirbelsäule" in one line
             )
             t.setStyle(TableStyle([
                 ("VALIGN",        (0, 0), (-1, -1), "TOP"),
@@ -367,13 +364,12 @@ def generate_report_pdf(result: dict) -> bytes:
     else:
         _action_block(critical, "Kritisch: sofortiger Handlungsbedarf", S["critical_hdr"], _RED)
         _action_block(medium,   "Mittel: empfohlene Maßnahmen",        S["medium_hdr"],   _AMBER)
-        story.append(Paragraph("Rechts: mögliche Senkung der Belastung in dieser Körperregion.", S["note"]))
 
     story.append(Spacer(1, 0.8 * cm))
     story.append(HRFlowable(width=_CONTENT_W, color=_LINE, thickness=0.5))
     story.append(Spacer(1, 0.3 * cm))
     story.append(Paragraph(
-        "Dieser Bericht wurde automatisch durch die Motavi Ergonomie-KI erstellt. "
+        "Dieser Bericht wurde automatisch aus dem Video erstellt (Pilotphase). "
         "Die Ergebnisse ersetzen keine fachkundige ergonomische Beurteilung vor Ort.",
         S["disclaimer"],
     ))

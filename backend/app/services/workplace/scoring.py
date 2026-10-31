@@ -31,7 +31,7 @@ KENNZAHL_TEXT = {
     "teilegewicht_kg": "Teilegewicht in kg",
     "groesste_kante_cm": "größte Kante in cm",
     "zone_knie_bis_schulter": "Zeitanteil Hände zwischen Knie und Schulter",
-    "reba_mittel": "REBA-Mittel",
+    "reba_mittel": "Haltungsindex",
     "buecken_anteil": "Zeitanteil Bücken",
     "ueberkopf_anteil": "Zeitanteil Überkopf",
     "drehung_anteil": "Zeitanteil Drehung",
@@ -175,7 +175,7 @@ def vorrang(cfg: ScoringConfig, reba_mittel: float | None) -> VorrangErgebnis:
     s = cfg.vorrang.reba_mittel_ab
     if reba_mittel is not None and reba_mittel >= s:
         wert = f"{reba_mittel:.1f}".replace(".", ",")
-        return VorrangErgebnis(True, cfg.vorrang.text, f"REBA-Mittel {wert} ab {s:g}")
+        return VorrangErgebnis(True, cfg.vorrang.text, f"Haltungsindex {wert} ab {s:g}")
     return VorrangErgebnis(False, None, None)
 
 

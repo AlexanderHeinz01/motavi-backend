@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from reportlab import rl_config
 
-from backend.app.services import pdf
+from backend.app.services import analyzer, pdf
 
 RESULT = json.loads((Path(__file__).parent / "golden" / "testvideo_result.json").read_text(encoding="utf-8"))
 
@@ -54,24 +54,25 @@ def test_report_has_four_pages_and_decimal_commas(monkeypatch):
 
 
 @pytest.mark.parametrize("score, stufe", [
-    (1.0, "Vernachlässigbar"), (1.99, "Vernachlässigbar"), (2.0, "Niedrig"), (3.9, "Niedrig"), (4.0, "Mittel"),
-    (7.64, "Mittel"), (7.99, "Mittel"), (8.0, "Hoch"), (10.9, "Hoch"), (11.0, "Sehr hoch"), (15.0, "Sehr hoch"),
+    (1.0, "Niedrig"), (3.99, "Niedrig"), (4.0, "Mittel"), (5.99, "Mittel"), (6.0, "Hoch"),
+    (7.64, "Hoch"), (7.99, "Hoch"), (8.0, "Sehr hoch"), (10.0, "Sehr hoch"),
 ])
-def test_reba_levels_as_on_the_website(score, stufe):
-    # bounds of rebaStufe in the motavi repo (src/lib/steckbrief.ts): below 2, 4, 8, 11
+def test_index_levels_as_everywhere(score, stufe):
+    # posture index 1 to 10, bounds 4, 6, 8 (docs/HALTUNGSINDEX.md), same as analyzer.stufe
     assert pdf.reba_stufe(score)[0] == stufe
+    assert analyzer.stufe(score) == {"Niedrig": "LOW", "Mittel": "MEDIUM", "Hoch": "HIGH", "Sehr hoch": "VERY_HIGH"}[stufe]
 
 
 def test_report_uses_score_not_old_level(monkeypatch):
     monkeypatch.setattr(rl_config, "pageCompression", 0)
-    # result.json says HIGH (old bounds); 7.6 is "mittel" on the REBA scale
-    data = pdf.generate_report_pdf({**RESULT, "reba_level": "HIGH"})
-    assert b"(Mittel: Ma" in data  # umlauts are escaped in the PDF stream
-    assert b"Korrekturma" not in data and b"(Hoch: " not in data
+    # the level comes from the index, not from reba_level in result.json
+    data = pdf.generate_report_pdf({**RESULT, "reba_level": "LOW"})
+    assert b"(Hoch: Gestaltung bald verbessern)" in data
+    assert b"(Niedrig: " not in data
 
 
 def test_no_unchecked_legal_claim(monkeypatch):
     # "DSGVO-konform" only after a legal check (decision of 30.10.2026)
     monkeypatch.setattr(rl_config, "pageCompression", 0)
     data = pdf.generate_report_pdf(RESULT)
-    assert b"DSGVO" not in data and b"Server in Deutschland" in data  # parentheses are escaped in the PDF
+    assert b"DSGVO" not in data and b"Analyse auf Servern in Deutschland" in data  # parentheses are escaped in the PDF

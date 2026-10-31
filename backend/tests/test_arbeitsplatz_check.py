@@ -22,10 +22,11 @@ WEBSITE = Path(os.environ.get("MOTAVI_WEBSITE_REPO", ROOT.parent / "motavi"))
 
 # WEBSITE_PLAN Phase 3 acceptance: four profiles, four different recommendations
 PROFILE = {
-    "verschwendungsreich": ([1, 1, 2, 1, 3, 2, 1, 1], (82, 40, "improve")),
+    # values set anew on 31.10.2026 (posture index 1 to 10, docs/HALTUNGSINDEX.md)
+    "verschwendungsreich": ([1, 1, 2, 1, 3, 2, 1, 1], (83, 41, "improve")),
     "repetitiv_und_bereinigt": ([3, 3, 0, 0, 0, 1, 3, 2], (21, 87, "automate")),
-    "repetitiv_mit_verschwendung": ([2, 2, 1, 0, 2, 2, 2, 2], (64, 77, "improve-then-automate")),
-    "hochvariabel": ([0, 0, 3, 2, 1, 0, 0, 0], (31, 8, "keep")),
+    "repetitiv_mit_verschwendung": ([2, 2, 1, 0, 2, 2, 2, 2], (65, 78, "improve-then-automate")),
+    "hochvariabel": ([0, 0, 3, 2, 1, 0, 0, 0], (30, 7, "keep")),
 }
 
 
@@ -57,7 +58,9 @@ def test_four_profiles_four_recommendations(name):
 def test_priority_from_posture_answer():
     *_, vor = check(CFG, [1, 1, 1, 1, 1, 3, 1, 1])  # "ständig" gebückt, über Kopf oder gedreht
     assert vor.vorrangig
-    *_, vor = check(CFG, [1, 1, 1, 1, 1, 2, 1, 1])
+    *_, vor = check(CFG, [1, 1, 1, 1, 1, 2, 1, 1])  # "häufig": index 7, stage high
+    assert vor.vorrangig
+    *_, vor = check(CFG, [1, 1, 1, 1, 1, 1, 1, 1])  # "gelegentlich": index 5
     assert not vor.vorrangig
 
 

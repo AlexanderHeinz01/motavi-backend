@@ -18,6 +18,8 @@ PILOTPHASE = [
     "zykluszeit_median_s", "zykluszeit_vk", "zyklen_pro_schicht", "zeitanteil_in_zyklen", "ablaufschritte",
     "hoehenzonen", "griffe_ausserhalb_greifraum", "drehung_anteil", "drehungen_pro_zyklus",
     "verbesserungs_score", "automatisierungs_score",
+    # posture index based on REBA, not checked against manual assessments (decision B1)
+    "reba_mittel", "reba_max",
 ]
 
 _KUNDE = (

@@ -55,7 +55,7 @@ def _zeile(k, werte: dict) -> str:
         "besetzung_schwierigkeit": lambda: f"Stellenbesetzung: Schwierigkeit {zahl(m)} von 5",
     }
     if k.kennzahl == "belastung_index" and werte.get("reba_mittel") is not None:
-        return f"Belastung: REBA-Mittel {zahl(werte['reba_mittel'], 1)}"
+        return f"Belastung: Haltungsindex {zahl(werte['reba_mittel'], 1)}"
     if k.kennzahl == "handhabbarkeit_index" and werte.get("teilegewicht_kg") is not None:
         return f"Teilegewicht {zahl(werte['teilegewicht_kg'], 1)}\u00a0kg"
     if k.kennzahl in saetze:

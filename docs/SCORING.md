@@ -10,11 +10,11 @@ Alles, was bewertet, steht in dieser Datei. Im Code gibt es keine Gewichte, Schw
 |---|---|
 | `schritt_typen` | Ablaufschritte und Standardeinstufung (auch für die Expertenansicht aus S3) |
 | `vermeidbarer_anteil` | je Verschwendungstyp, z.B. Suchen 0,8 |
-| `belastung` | Belastungsindex aus REBA-Mittel, Bücken, Überkopf, Drehung |
+| `belastung` | Belastungsindex aus Haltungsindex auf REBA-Basis (`docs/HALTUNGSINDEX.md`), Bücken, Überkopf, Drehung |
 | `handhabbarkeit` | Handhabbarkeitsindex aus Teilegewicht und größter Kante |
 | `verbesserungs_score`, `automatisierungs_score` | Kriterien mit Gewicht und Abbildung auf 0 bis 1 |
 | `empfehlung` | Schwellen 50 und 60, Entscheidungstabelle, Texte |
-| `vorrang` | REBA-Mittel ab 8 |
+| `vorrang` | Haltungsindex ab 6 (Stufe hoch) |
 | `automatisierungstypen` | Regeln in Prüfreihenfolge, Standardbandbreiten für automatisierbaren Anteil und Investition |
 | `kundenangaben` | Toleranz der Plausibilitätsprüfung Stück pro Schicht |
 | `wirtschaftlichkeit` | Pflichthinweis |
@@ -23,7 +23,7 @@ Beim Start prüft `backend/app/services/workplace/scoring_config.py` die Datei: 
 
 Die Website (Repo `motavi`) liest eine Kopie unter demselben Pfad: `npm run sync:scoring` kopiert sie aus diesem Repo. `test_arbeitsplatz_check.py` hier und `src/lib/scoring.test.ts` dort schlagen fehl, wenn die Kopie abweicht. Nach jeder Änderung an der Datei also im Website-Repo `npm run sync:scoring` ausführen.
 
-**Arbeitsplatz-Check** (`arbeitsplatz_check`): acht Fragen der Website mit je vier Antworten. Jede Antwort setzt Kennzahlen auf einen typischen Wert (z.B. „200 bis 600 Mal“ setzt 400 Zyklen pro Schicht), danach entscheiden dieselben Scores und Regeln wie im Steckbrief. Beim Laden wird geprüft, dass jede Kennzahl bekannt ist und jedes Kriterium beider Scores von einer Frage abgedeckt wird. Über alle 65.536 Antwortkombinationen ergibt der Check Verbessern 36 %, Beibehalten 31 %, Erst verbessern, dann automatisieren 22 %, Automatisieren 12 %.
+**Arbeitsplatz-Check** (`arbeitsplatz_check`): acht Fragen der Website mit je vier Antworten. Jede Antwort setzt Kennzahlen auf einen typischen Wert (z.B. „200 bis 600 Mal“ setzt 400 Zyklen pro Schicht), danach entscheiden dieselben Scores und Regeln wie im Steckbrief. Beim Laden wird geprüft, dass jede Kennzahl bekannt ist und jedes Kriterium beider Scores von einer Frage abgedeckt wird. Über alle 65.536 Antwortkombinationen ergibt der Check Verbessern 35 %, Beibehalten 31 %, Erst verbessern, dann automatisieren 23 %, Automatisieren 11 % (Stand 31.10.2026, Haltungsindex 1 bis 10).
 
 Messschwellen (Ruhe, Gehen, Zyklusdauer, Drehwinkel) stehen weiter beim jeweiligen Messverfahren (`CycleConfig`, `ReachConfig`, `SegmentConfig`, `BelastungConfig`). Sie bestimmen, was gemessen wird, nicht wie es bewertet wird.
 
@@ -40,7 +40,7 @@ Score = 100 × Summe(Gewicht × Teilwert) / Summe der Gewichte mit Wert, kaufmä
 ## Empfehlung, Vorrang, Typ
 
 - Verbesserungs-Score ab 50 und Automatisierungs-Score ab 60 gelten als hoch (Schwelle eingeschlossen, verglichen mit dem gerundeten Score). Die Tabelle ordnet die vier Empfehlungen zu, alle gleichwertig.
-- **Vorrangig** ab REBA-Mittel 8, unabhängig von der Empfehlung.
+- **Vorrangig** ab Haltungsindex 6 (Stufe hoch), unabhängig von der Empfehlung.
 - **Automatisierungstyp** nur bei einer Empfehlung mit Automatisierung. Die Regeln werden in der Reihenfolge der Datei geprüft (spezifisch vor allgemein: Palettieren, Maschinenbeladung, Prüfautomatisierung, Pick and Place). Vorschlag ist der erste Typ, dessen Bedingungen alle erfüllt sind. Fehlt ein Wert (z.B. Teilegewicht), bleibt die Regel offen und blockiert die folgenden nicht. Alle Regeln mit erfüllten und offenen Bedingungen stehen im Steckbrief als Begründung.
 - Empfehlung und Typ tragen `status: "vorschlag"`. Die Bestätigung durch den Experten kommt mit der Expertenansicht in S5.
 
@@ -102,8 +102,8 @@ Unbekannte Felder werden abgelehnt (422). Gespeichert in `results/{job_id}/input
 | Profil | Verbesserung | Automatisierung | Empfehlung | Typ |
 |---|---|---|---|---|
 | Montage (wie Demo in Abschnitt 7) | 55 | 81 | Erst verbessern, dann automatisieren | Pick and Place |
-| Rüstplatz, Suchen und Gehen, 40 Varianten | 91 | 31 | Verbessern | keiner |
-| schlanker 20-s-Takt, eine Variante | 13 | 88 | Automatisieren | Pick and Place |
-| lange, wechselnde Arbeit, wenig Verschwendung | 23 | 20 | Beibehalten | keiner |
+| Rüstplatz, Suchen und Gehen, 40 Varianten | 92 | 32 | Verbessern | keiner |
+| schlanker 20-s-Takt, eine Variante | 11 | 87 | Automatisieren | Pick and Place |
+| lange, wechselnde Arbeit, wenig Verschwendung | 21 | 19 | Beibehalten | keiner |
 
 Die Startwerte der Konfiguration sind Annahmen. Vor dem Pilotbetrieb an drei bis fünf Arbeitsplätzen gegen die eigene Expertenbewertung prüfen und nachjustieren (Abschnitt 8).

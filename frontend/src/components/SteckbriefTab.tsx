@@ -335,7 +335,7 @@ export default function SteckbriefTab({ jobId }: { jobId: string }) {
               <Zeile label="Zeitanteil in Zyklen" value={kz(z.zeitanteil_in_zyklen, prozent)} />
             </div>
             <div>
-              <Zeile label="REBA Mittel / Max" value={b.reba_mittel.belastbar ? `${kz(b.reba_mittel, (v) => zahl(v, 1))} / ${kz(b.reba_max, (v) => zahl(v, 1))}` : NB} />
+              <Zeile label="Haltungsindex Mittel / Max (1 bis 10)" value={b.reba_mittel.belastbar ? `${kz(b.reba_mittel, (v) => zahl(v, 1))} / ${kz(b.reba_max, (v) => zahl(v, 1))}` : NB} />
               <Zeile label="Bücken" value={kz(b.buecken_anteil, prozent)} />
               <Zeile label="Überkopf" value={kz(b.ueberkopf_anteil, prozent)} />
               <Zeile label="Drehung" value={kz(b.drehung_anteil, prozent)} />

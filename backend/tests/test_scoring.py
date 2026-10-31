@@ -27,7 +27,7 @@ def test_config_is_the_only_source():
         assert sum(k.gewicht for k in s.kriterien.values()) == pytest.approx(1.0)
     assert CFG.vermeidbarer_anteil == {"Suchen": 0.8, "Gehen": 0.5, "Warten": 0.5, "Umgreifen": 0.7}
     assert CFG.empfehlung.schwelle_verbesserung == 50 and CFG.empfehlung.schwelle_automatisierung == 60
-    assert CFG.vorrang.reba_mittel_ab == 8
+    assert CFG.vorrang.reba_mittel_ab == 6
 
 
 def test_weights_as_in_the_plan():
@@ -125,7 +125,8 @@ def test_four_profiles_give_the_four_recommendations(name):
 
 def test_profile_scores():
     scores = {n: (build(n)["verbesserungs_score"]["wert"], build(n)["automatisierungs_score"]["wert"]) for n in PROFILE}
-    assert scores == {"improve-then-automate": (55, 81), "improve": (91, 31), "automate": (13, 88), "keep": (23, 20)}
+    # set anew on 31.10.2026: ramp of the posture index 3 to 8 (docs/HALTUNGSINDEX.md)
+    assert scores == {"improve-then-automate": (55, 81), "improve": (92, 32), "automate": (11, 87), "keep": (21, 19)}
 
 
 @pytest.mark.parametrize("v, a, expected", [
@@ -158,7 +159,7 @@ def test_no_cycle_is_a_result_and_never_automation():
 # ── priority ─────────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("reba, vorrangig", [(7.99, False), (8.0, True), (11.0, True)])
+@pytest.mark.parametrize("reba, vorrangig", [(5.99, False), (6.0, True), (9.0, True)])
 def test_priority_threshold(reba, vorrangig):
     v = scoring.vorrang(CFG, reba)
     assert v.vorrangig is vorrangig
@@ -168,7 +169,7 @@ def test_priority_threshold(reba, vorrangig):
 def test_priority_independent_of_recommendation():
     doc = build("automate", belastung=(8.5, 0.05, 0.0, 0.05))
     assert doc["empfehlung"]["id"] == "automate" and doc["empfehlung"]["vorrangig"]
-    assert "REBA-Mittel 8,5" in doc["empfehlung"]["vorrang_grund"]
+    assert "Haltungsindex 8,5" in doc["empfehlung"]["vorrang_grund"]
     assert not build("keep")["empfehlung"]["vorrangig"]
     assert scoring.vorrang(CFG, None).vorrangig is False
 

@@ -257,8 +257,8 @@ def _seite1(doc: dict, st: dict) -> list:
     ]
     belastung_rows = [
         ["Belastung", ""],
-        ["REBA Mittelwert", _k(b.get("reba_mittel"), s1)],
-        ["REBA Maximum", _k(b.get("reba_max"), s1)],
+        ["Haltungsindex Mittelwert (1 bis 10)", _k(b.get("reba_mittel"), s1)],
+        ["Haltungsindex Maximum", _k(b.get("reba_max"), s1)],
         ["Zeitanteil Bücken", _k(b.get("buecken_anteil"), prozent)],
         ["Zeitanteil Überkopf", _k(b.get("ueberkopf_anteil"), prozent)],
         ["Zeitanteil Drehung", _k(b.get("drehung_anteil"), prozent)],
@@ -273,7 +273,7 @@ def _seite1(doc: dict, st: dict) -> list:
         ),
         Spacer(1, 6),
         Paragraph(
-            "Pilotphase: Zyklen, Ablaufschritte, Greifraum, Drehung und REBA sind noch nicht gegen manuelle Messungen und Bewertungen validiert. "
+            "Pilotphase: Zyklen, Ablaufschritte, Greifraum, Drehung und Haltungsindex (auf REBA-Basis, kein REBA-Wert) sind noch nicht gegen manuelle Messungen und Bewertungen validiert. "
             "„nicht belastbar messbar“ steht, wo die Messqualität unter der Schwelle liegt.",
             st["klein"],
         ),

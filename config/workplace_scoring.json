@@ -25,9 +25,9 @@
   },
 
   "belastung": {
-    "_kommentar": "Belastungsindex 0 bis 1 aus REBA-Mittel und den Zeitanteilen Bücken, Überkopf und Drehung. Jede Kennzahl wird linear zwischen null_bei (0) und voll_bei (1) abgebildet. Fehlt eine Kennzahl, verteilt sich ihr Gewicht auf die übrigen.",
+    "_kommentar": "Belastungsindex 0 bis 1 aus dem Haltungsindex auf REBA-Basis (1 bis 10, Feld reba_mittel; 3 entspricht etwa aufrechtem Stehen, ab 8 sehr hoch) und den Zeitanteilen Bücken, Überkopf und Drehung. Jede Kennzahl wird linear zwischen null_bei (0) und voll_bei (1) abgebildet. Fehlt eine Kennzahl, verteilt sich ihr Gewicht auf die übrigen.",
     "teile": {
-      "reba_mittel": {"gewicht": 0.5, "null_bei": 2, "voll_bei": 9},
+      "reba_mittel": {"gewicht": 0.5, "null_bei": 3, "voll_bei": 8},
       "buecken_anteil": {"gewicht": 0.2, "null_bei": 0, "voll_bei": 0.3},
       "ueberkopf_anteil": {"gewicht": 0.2, "null_bei": 0, "voll_bei": 0.2},
       "drehung_anteil": {"gewicht": 0.1, "null_bei": 0, "voll_bei": 0.3}
@@ -95,8 +95,8 @@
   },
 
   "vorrang": {
-    "_kommentar": "Zusatzregel aus Abschnitt 5.3: unabhängig von der Empfehlung als vorrangig markieren.",
-    "reba_mittel_ab": 8,
+    "_kommentar": "Zusatzregel aus Abschnitt 5.3: unabhängig von der Empfehlung als vorrangig markieren, ab Stufe hoch des Haltungsindex (docs/HALTUNGSINDEX.md).",
+    "reba_mittel_ab": 6,
     "text": "Vorrangig: hohe körperliche Belastung"
   },
 
@@ -194,10 +194,10 @@
         {"id": "viel", "werte": {"verschwendung_anteil": 0.35}}
       ]},
       {"id": "haltung", "antworten": [
-        {"id": "selten", "werte": {"reba_mittel": 2.5, "buecken_anteil": 0.02, "ueberkopf_anteil": 0.0, "drehung_anteil": 0.03, "griffe_ausserhalb": 0.05}},
-        {"id": "gelegentlich", "werte": {"reba_mittel": 4.5, "buecken_anteil": 0.08, "ueberkopf_anteil": 0.03, "drehung_anteil": 0.08, "griffe_ausserhalb": 0.15}},
+        {"id": "selten", "werte": {"reba_mittel": 3.0, "buecken_anteil": 0.02, "ueberkopf_anteil": 0.0, "drehung_anteil": 0.03, "griffe_ausserhalb": 0.05}},
+        {"id": "gelegentlich", "werte": {"reba_mittel": 5.0, "buecken_anteil": 0.08, "ueberkopf_anteil": 0.03, "drehung_anteil": 0.08, "griffe_ausserhalb": 0.15}},
         {"id": "haeufig", "werte": {"reba_mittel": 7.0, "buecken_anteil": 0.2, "ueberkopf_anteil": 0.1, "drehung_anteil": 0.2, "griffe_ausserhalb": 0.3}},
-        {"id": "staendig", "werte": {"reba_mittel": 9.5, "buecken_anteil": 0.35, "ueberkopf_anteil": 0.2, "drehung_anteil": 0.35, "griffe_ausserhalb": 0.45}}
+        {"id": "staendig", "werte": {"reba_mittel": 8.5, "buecken_anteil": 0.35, "ueberkopf_anteil": 0.2, "drehung_anteil": 0.35, "griffe_ausserhalb": 0.45}}
       ]},
       {"id": "zeitanteil", "antworten": [
         {"id": "unter_viertel", "werte": {"zeitanteil_in_zyklen": 0.15}},
