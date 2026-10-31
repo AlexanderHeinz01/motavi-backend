@@ -1,14 +1,21 @@
 """Steckbrief module API (STECKBRIEF_MODUL §4.3 to §6).
 
-GET  /workplace/{job_id}            Steckbrief: scores, recommendation, type, economics (signed in)
-PUT  /workplace/{job_id}/inputs     customer inputs (signed in)
-GET  /workplace/{job_id}/pdf        PDF Steckbrief, 2 pages (signed in)
-GET  /workplace/{job_id}/export     JSON export, docs/steckbrief_schema.json (signed in)
+GET  /workplace/{job_id}            Steckbrief: scores, recommendation, type, economics (access to the job)
+PUT  /workplace/{job_id}/inputs     customer inputs (access to the job)
+GET  /workplace/{job_id}/pdf        PDF Steckbrief, 2 pages (access to the job)
+GET  /workplace/{job_id}/export     JSON export, docs/steckbrief_schema.json (access to the job)
 GET  /workplace/{job_id}/ablauf     proposal in the median cycle, saved review, result (consultants)
 PUT  /workplace/{job_id}/review     confirm or correct the steps; transferred to all cycles (consultants)
 PUT  /workplace/{job_id}/empfehlung confirm or change recommendation and type (consultants)
 
-Consultants: role "berater" or "admin".
+Consultants: role "berater" or "admin". Access to a job: routers/auth.py require_job.
+
+Frozen Steckbrief (E.2.14 of the review on 31.10.2026): once the expert has
+confirmed the recommendation, the Steckbrief is saved as steckbrief.json and
+served from there. It no longer depends on pose.npz (deleted after 30 days)
+and reading it writes nothing, so the 365 days run from the last change. A
+change of inputs, review or confirmation by the team freezes it anew. Without
+confirmation the Steckbrief is computed on every request and not saved.
 """
 import io
 import json
@@ -44,7 +51,7 @@ from ..services.workplace.segments import (
     transfer,
     validate_review,
 )
-from .auth import get_current_user, require_berater
+from .auth import require_berater_job, require_job
 
 router = APIRouter()
 
@@ -123,14 +130,14 @@ def _response(job_id: str, zyklen, median, vorschlag, review: dict | None) -> Ab
 
 
 @router.get("/workplace/{job_id}/ablauf", response_model=AblaufResponse)
-async def get_ablauf(job_id: str, user: dict = Depends(require_berater)) -> AblaufResponse:
+def get_ablauf(job_id: str, user: dict = Depends(require_berater_job)) -> AblaufResponse:
     zyklen, median, vorschlag = _analyse(job_id)
     review = gcs.get_json(_path(job_id, "review.json"))
     return _response(job_id, zyklen, median, vorschlag, review)
 
 
 @router.put("/workplace/{job_id}/review", response_model=AblaufResponse)
-async def put_review(job_id: str, body: ReviewRequest, user: dict = Depends(require_berater)) -> AblaufResponse:
+def put_review(job_id: str, body: ReviewRequest, user: dict = Depends(require_berater_job)) -> AblaufResponse:
     zyklen, median, vorschlag = _analyse(job_id)
     if not zyklen.erkannt:
         raise HTTPException(status_code=409, detail=f"{zyklen.hinweis}: Ablaufschritte lassen sich nicht auf Zyklen übertragen.")
@@ -152,6 +159,7 @@ async def put_review(job_id: str, body: ReviewRequest, user: dict = Depends(requ
         "bestaetigt_am": datetime.now(timezone.utc).isoformat(),
     }
     gcs.put_json(_path(job_id, "review.json"), review)
+    _neu_einfrieren(job_id)
     return _response(job_id, zyklen, median, vorschlag, review)
 
 
@@ -174,33 +182,48 @@ def _ergebnisse(job_id: str, kunde: dict | None = None) -> dict:
     )
 
 
-def _steckbrief(job_id: str, kunde: dict | None = None, bestaetigung: dict | None = None, speichern: bool = True) -> dict:
-    """bestaetigung: use this instead of the saved one (None: saved one)."""
+def _steckbrief(job_id: str, kunde: dict | None = None, bestaetigung: dict | None = None) -> dict:
+    """Compute the Steckbrief; bestaetigung: use this instead of the saved one (None: saved one)."""
     if bestaetigung is None:
         bestaetigung = gcs.get_json(_path(job_id, "empfehlung.json"))
-    doc = steckbrief.build(scoring_config.get(), job_id, **_ergebnisse(job_id, kunde), bestaetigung=bestaetigung or None)
-    if speichern:
-        gcs.put_json(_path(job_id, "workplace.json"), doc)
+    return steckbrief.build(scoring_config.get(), job_id, **_ergebnisse(job_id, kunde), bestaetigung=bestaetigung or None)
+
+
+def _aktuell(job_id: str) -> dict:
+    """Frozen Steckbrief if confirmed, otherwise computed now (not saved)."""
+    return gcs.get_json(_path(job_id, "steckbrief.json")) or _steckbrief(job_id)
+
+
+def _einfrieren(job_id: str, doc: dict) -> dict:
+    gcs.put_json(_path(job_id, "steckbrief.json"), doc)
     return doc
 
 
+def _neu_einfrieren(job_id: str) -> None:
+    """After a change by the team: freeze again if the Steckbrief is confirmed."""
+    if gcs.get_json(_path(job_id, "empfehlung.json")):
+        _einfrieren(job_id, _steckbrief(job_id))
+
+
 @router.get("/workplace/{job_id}")
-async def get_steckbrief(job_id: str, user: dict = Depends(get_current_user)) -> dict:
-    """Steckbrief with scores, recommendation (proposal), type and economics."""
-    return _steckbrief(job_id)
+def get_steckbrief(job_id: str, user: dict = Depends(require_job)) -> dict:
+    """Steckbrief with scores, recommendation, type and economics."""
+    return _aktuell(job_id)
 
 
 @router.put("/workplace/{job_id}/inputs")
-async def put_inputs(job_id: str, body: Kundenangaben, user: dict = Depends(get_current_user)) -> dict:
+def put_inputs(job_id: str, body: Kundenangaben, user: dict = Depends(require_job)) -> dict:
     """Save the customer inputs and return the recomputed Steckbrief."""
     kunde = body.model_dump(exclude_none=True)
     doc = _steckbrief(job_id, kunde)  # 404 without pose data, before anything is saved
     gcs.put_json(_path(job_id, "inputs.json"), kunde)
+    if gcs.get_json(_path(job_id, "empfehlung.json")):
+        _einfrieren(job_id, doc)
     return doc
 
 
 @router.put("/workplace/{job_id}/empfehlung")
-async def put_empfehlung(job_id: str, body: EmpfehlungBestaetigung, user: dict = Depends(require_berater)) -> dict:
+def put_empfehlung(job_id: str, body: EmpfehlungBestaetigung, user: dict = Depends(require_berater_job)) -> dict:
     """The expert confirms or changes recommendation and automation type (§5.3, §5.4, §6.4)."""
     cfg = scoring_config.get()
     mit_auto = body.empfehlung_id in cfg.empfehlung.mit_automatisierung
@@ -210,7 +233,7 @@ async def put_empfehlung(job_id: str, body: EmpfehlungBestaetigung, user: dict =
         if steckbrief.typ_regel(cfg, body.typ_id) is None:
             raise HTTPException(status_code=422, detail=f"Unbekannter Automatisierungstyp {body.typ_id!r}.")
     # the current proposal, so that a later change of it can be pointed out
-    vorschlag = _steckbrief(job_id, bestaetigung={}, speichern=False)
+    vorschlag = _steckbrief(job_id, bestaetigung={})
     bestaetigung = {
         "empfehlung_id": body.empfehlung_id,
         "typ_id": body.typ_id,
@@ -221,7 +244,7 @@ async def put_empfehlung(job_id: str, body: EmpfehlungBestaetigung, user: dict =
         "bestaetigt_am": datetime.now(timezone.utc).isoformat(),
     }
     gcs.put_json(_path(job_id, "empfehlung.json"), bestaetigung)
-    return _steckbrief(job_id, bestaetigung=bestaetigung)
+    return _einfrieren(job_id, _steckbrief(job_id, bestaetigung=bestaetigung))
 
 
 def _dateiname(doc: dict, endung: str) -> str:
@@ -229,8 +252,8 @@ def _dateiname(doc: dict, endung: str) -> str:
 
 
 @router.get("/workplace/{job_id}/pdf")
-async def get_pdf(job_id: str, user: dict = Depends(get_current_user)) -> StreamingResponse:
-    doc = _steckbrief(job_id)
+def get_pdf(job_id: str, user: dict = Depends(require_job)) -> StreamingResponse:
+    doc = _aktuell(job_id)
     e = scoring_config.get().empfehlung
     data = pdf_steckbrief.generate(doc, (e.schwelle_verbesserung, e.schwelle_automatisierung))
     return StreamingResponse(
@@ -240,8 +263,8 @@ async def get_pdf(job_id: str, user: dict = Depends(get_current_user)) -> Stream
 
 
 @router.get("/workplace/{job_id}/export")
-async def get_export(job_id: str, user: dict = Depends(get_current_user)) -> Response:
-    doc = _steckbrief(job_id)
+def get_export(job_id: str, user: dict = Depends(require_job)) -> Response:
+    doc = _aktuell(job_id)
     body = json.dumps(export.to_export(doc), ensure_ascii=False, indent=2)
     return Response(
         body, media_type="application/json",

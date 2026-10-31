@@ -1,6 +1,6 @@
 /**
  * SVG body-region heatmap.
- * Each highlighted region is coloured by its REBA subscore (raw → normalised).
+ * Each highlighted region is coloured by its region score based on REBA (raw → normalised).
  * Regions: lumbar, shoulder_l/r, neck, forearm, knee_l/r.
  */
 

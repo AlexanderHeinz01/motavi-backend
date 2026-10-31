@@ -1,22 +1,24 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import RequireAuth from './auth/RequireAuth'
 import RequireBerater from './auth/RequireBerater'
-import MarketingPage from './marketing/MarketingPage'
 import AnalyzingPage from './pages/AnalyzingPage'
 import DashboardPage from './pages/DashboardPage'
 import ExpertPage from './pages/ExpertPage'
+import HochladenPage from './pages/HochladenPage'
 import LoginPage from './pages/LoginPage'
 import UploadPage from './pages/UploadPage'
 
+/** Internal tool of the Motavi team plus the upload page for customers (G2 on 31.10.2026). */
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
           {/* Public */}
-          <Route path="/" element={<MarketingPage />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/hochladen/:token" element={<HochladenPage />} />
 
           {/* Protected ergonomics analysis app */}
           <Route path="/app" element={<RequireAuth><UploadPage /></RequireAuth>} />

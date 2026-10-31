@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { getFrameUrl, getReportPdfUrl } from '../api/motavi'
+import { downloadReport, frameUrl } from '../api/motavi'
 import { BERATER_ROLLEN } from '../api/workplace'
 import { useAuth } from '../auth/AuthContext'
 import ActionItems   from '../components/ActionItems'
@@ -12,16 +13,19 @@ import { useAnalysis } from '../hooks/useAnalysis'
 import { rebaStufe, rebaText } from '../lib/rebaStufe'
 
 function Card({
-  title, children, className = '',
+  title, children, className = '', tag,
 }: {
   title: string
   children: React.ReactNode
   className?: string
+  /** e.g. "Pilotphase" for values not yet validated */
+  tag?: string
 }) {
   return (
     <div className={`rounded-2xl bg-bg-secondary p-5 flex flex-col gap-4 ${className}`}>
-      <h3 className="font-headline text-xs font-semibold uppercase tracking-widest text-neutral/40">
+      <h3 className="font-headline text-xs font-semibold uppercase tracking-widest text-neutral/40 flex items-center gap-2">
         {title}
+        {tag && <span className="rounded border border-amber-400/40 px-1.5 py-0.5 font-mono text-[10px] text-amber-300 normal-case tracking-normal">{tag}</span>}
       </h3>
       {children}
     </div>
@@ -38,7 +42,8 @@ export default function DashboardPage() {
   const { jobId }  = useParams<{ jobId: string }>()
   const navigate   = useNavigate()
   const { status, result, error } = useAnalysis(jobId)
-  const { user } = useAuth()
+  const { user, token } = useAuth()
+  const [reportFehler, setReportFehler] = useState<string | null>(null)
   const berater = !!user && BERATER_ROLLEN.includes(user.role)
   // tab in the URL (?tab=steckbrief), so a link opens the Steckbrief directly
   const [params, setParams] = useSearchParams()
@@ -95,10 +100,9 @@ export default function DashboardPage() {
           </button>
         )}
         {/* PDF Export */}
-        {result && (
-          <a
-            href={getReportPdfUrl(result.job_id)}
-            download
+        {result && token && (
+          <button
+            onClick={() => downloadReport(result.job_id, token).catch((e: Error) => setReportFehler(e.message))}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-secondary
               border border-neutral/10 hover:border-data/50 transition-colors
               font-body text-sm text-neutral/70 hover:text-white"
@@ -108,8 +112,9 @@ export default function DashboardPage() {
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             PDF-Report
-          </a>
+          </button>
         )}
+        {reportFehler && <span className="font-body text-xs text-accent">{reportFehler}</span>}
         </div>
       </header>
 
@@ -149,7 +154,7 @@ export default function DashboardPage() {
                   style={{ color: rebaStufe(result.reba_score).farbe }}>
                   {rebaText(result.reba_score)}
                 </span>
-                <span className="font-body text-xs text-neutral/40">REBA-Score · {rebaStufe(result.reba_score).stufe}</span>
+                <span className="font-body text-xs text-neutral/40">Haltungsindex auf REBA-Basis (1 bis 10) · {rebaStufe(result.reba_score).stufe} · Pilotphase</span>
               </div>
               <div className="h-10 w-px bg-bg-secondary" />
               <div className="flex flex-col">
@@ -169,17 +174,17 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-              {/* 1 — REBA Gauge */}
-              <Card title="REBA-Score">
+              {/* 1: posture index gauge */}
+              <Card title="Haltungsindex auf REBA-Basis" tag="Pilotphase">
                 <REBAGauge score={result.reba_score} />
               </Card>
 
-              {/* 2 — Body Heatmap */}
-              <Card title="Körperregionen-Heatmap">
+              {/* 2: body heatmap */}
+              <Card title="Körperregionen-Heatmap" tag="Pilotphase">
                 <BodyHeatmap regions={result.body_regions} />
               </Card>
 
-              {/* 3 — Movement chart */}
+              {/* 3: movement chart */}
               <Card title="Bewegungsklassifikation">
                 <MovementChart
                   movements={result.movements}
@@ -187,19 +192,19 @@ export default function DashboardPage() {
                 />
               </Card>
 
-              {/* 4 — Timeline */}
+              {/* 4: timeline */}
               <Card title="Bewegungszeitverlauf">
                 <TimelineChart timeline_frames={result.timeline_frames ?? []} />
               </Card>
 
-              {/* 5 — Action items (full width) */}
+              {/* 5: action items (full width) */}
               <Card title="Handlungsfelder" className="md:col-span-2">
                 <ActionItems items={result.action_items} />
               </Card>
 
             </div>
 
-            {/* 6 — Critical frames */}
+            {/* 6: critical frames */}
             {result.critical_frames && result.critical_frames.length > 0 && (
               <div className="mt-5">
                 <Card title="Kritische Bewegungsmomente" className="">
@@ -212,16 +217,18 @@ export default function DashboardPage() {
                       return (
                         <div key={cf.rank}
                           className="flex flex-col rounded-xl overflow-hidden border border-bg-primary bg-bg-primary">
-                          <img
-                            src={getFrameUrl(result.job_id, `critical_${cf.rank}.jpg`)}
-                            alt={`Kritischer Frame ${cf.rank}`}
-                            className="w-full aspect-video object-cover"
-                          />
+                          {cf.bild_url && (
+                            <img
+                              src={frameUrl(cf.bild_url)}
+                              alt={`Kritischer Moment ${cf.rank}, Köpfe geschwärzt`}
+                              className="w-full aspect-video object-cover"
+                            />
+                          )}
                           <div className="p-3 flex flex-col gap-1">
                             <div className="flex items-center justify-between">
                               <span className="font-mono text-xs text-neutral/50">{mm}:{ss}</span>
                               <span className="font-mono text-sm font-bold" style={{ color: '#e63946' }}>
-                                REBA {rebaText(cf.reba)}
+                                Index {rebaText(cf.reba)}
                               </span>
                             </div>
                             <span className="font-body text-xs text-neutral/40">{mvLabel}</span>
@@ -240,7 +247,7 @@ export default function DashboardPage() {
       {/* Footer */}
       <footer className="border-t border-bg-secondary px-6 py-4 text-center">
         <p className="font-body text-xs text-neutral/20">
-          Erstellt durch Motavi · Server in Deutschland (Frankfurt)
+          Erstellt durch Motavi · Analyse auf Servern in Deutschland (Frankfurt)
         </p>
       </footer>
     </div>

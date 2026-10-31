@@ -1,12 +1,18 @@
-"""MediaPipe-based REBA analysis pipeline.
+"""MediaPipe-based analysis pipeline: posture index based on REBA (1 to 10).
+
+The value is a weighted index of body-region scores, not the standard REBA
+(1 to 15 with load, coupling and activity); see docs/HALTUNGSINDEX.md.
+Field names (reba_score, reba) stay for compatibility.
 
 Runs as a FastAPI BackgroundTask. Steps:
-  1. Download raw video from GCS  (raw/{job_id}/video.mp4)
-  2. Per-frame: anonymise head region (MediaPipe Pose bbox, top 38 % of
-     person height + 20 px padding), write anonymised mp4 back to GCS
-  3. REBA subscore calculation, movement class and upper arm angle per
-     sampled frame (every int(fps) frames, about one sample per second)
-  4. Aggregate timeline, movement classes, body-region scores, action items
+  1. Download raw video from GCS  (raw/{job_id}/video.mp4) into a temp file
+  2. Region scores, movement class and upper arm angle per sampled frame
+     (every int(fps) frames, about one sample per second)
+  3. Aggregate timeline, movement classes, body-region scores, action items;
+     an error result instead when hardly any person was detected
+  4. Three critical frames from the original video, heads and faces of all
+     persons blacked out generously; frames without detection are dropped.
+     No video is kept (decision on 31.10.2026).
   5. Write results/{job_id}/result.json to GCS
   6. Delete the raw video, also when the analysis failed
      (docs/LOESCHKONZEPT.md)
@@ -20,10 +26,12 @@ os.environ["DISPLAY"] = ""
 os.environ["MESA_GL_VERSION_OVERRIDE"] = "3.3"
 
 import asyncio
+import hashlib
 import json
 import logging
 import math
 import tempfile
+import threading
 import urllib.request
 from pathlib import Path
 
@@ -32,27 +40,53 @@ import mediapipe as mp
 import numpy as np
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.core.base_options import BaseOptions
-from mediapipe.tasks.python.vision import PoseLandmarker, PoseLandmarkerOptions
+from mediapipe.tasks.python.vision import FaceDetector, FaceDetectorOptions, PoseLandmarker, PoseLandmarkerOptions
 
 from ..config import settings
 from . import gcs
 
 logger = logging.getLogger(__name__)
 
-# ── MediaPipe Tasks model ─────────────────────────────────────────────────────
-_MODEL_URL = (
-    "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
-    "pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task"
-)
-_MODEL_PATH = Path("/tmp/pose_landmarker_heavy.task")
+# ── MediaPipe Tasks models ────────────────────────────────────────────────────
+# Fixed versions with checksum; the Docker image contains both under
+# MODEL_DIR (Dockerfile). Outside the image they are downloaded once.
+_MODELS = {
+    "pose": (
+        "pose_landmarker_heavy.task",
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
+        "pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
+        "64437af838a65d18e5ba7a0d39b465540069bc8aae8308de3e318aad31fcbc7b",
+    ),
+    "face": (
+        "blaze_face_short_range.tflite",
+        "https://storage.googleapis.com/mediapipe-models/face_detector/"
+        "blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+        "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
+    ),
+}
+_model_lock = threading.Lock()
 
 
-def _ensure_model() -> None:
-    """Download the pose landmarker model file if not already cached."""
-    if not _MODEL_PATH.exists():
-        logger.info("Downloading pose model → %s", _MODEL_PATH)
-        urllib.request.urlretrieve(_MODEL_URL, _MODEL_PATH)
-        logger.info("Pose model downloaded (%d bytes)", _MODEL_PATH.stat().st_size)
+def _model_path(name: str) -> Path:
+    return Path(settings.MODEL_DIR) / _MODELS[name][0]
+
+
+def _ensure_model(name: str = "pose") -> Path:
+    """Model file, downloaded once if missing (never a half-written file)."""
+    path = _model_path(name)
+    with _model_lock:
+        if not path.exists():
+            _, url, sha = _MODELS[name]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            logger.info("Downloading model %s", path.name)
+            with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as tmp:
+                with urllib.request.urlopen(url, timeout=120) as resp:
+                    tmp.write(resp.read())
+            if hashlib.sha256(Path(tmp.name).read_bytes()).hexdigest() != sha:
+                os.unlink(tmp.name)
+                raise RuntimeError(f"Checksum of {path.name} does not match")
+            os.replace(tmp.name, path)
+    return path
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -77,7 +111,13 @@ def _pt(landmarks, idx: int, w: int, h: int) -> np.ndarray:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _reba_subscores(landmarks, w: int, h: int) -> dict[str, float]:
-    """Return per-region REBA-style subscores (raw, not yet normalised to 1-10)."""
+    """Return per-region scores based on REBA (raw, not yet normalised to 1-10).
+
+    Angles as in the REBA definition (corrected on 31.10.2026, same as the
+    browser port motavi/src/analysis/reba.ts): neck = trunk axis against
+    shoulder->ear midpoint, upper arm = angle to the trunk (shoulder->hip),
+    lower arm = elbow flexion with 60 to 100 degrees as the neutral band.
+    """
     def pt(idx: int) -> np.ndarray:
         return _pt(landmarks, idx, w, h)
 
@@ -87,7 +127,7 @@ def _reba_subscores(landmarks, w: int, h: int) -> dict[str, float]:
     l_hip,      r_hip      = pt(23), pt(24)
     l_knee,     r_knee     = pt(25), pt(26)
     l_ankle,    r_ankle    = pt(27), pt(28)
-    nose                   = pt(0)
+    mid_ear                = (pt(7) + pt(8)) / 2
 
     mid_shoulder = (l_shoulder + r_shoulder) / 2
     mid_hip      = (l_hip      + r_hip)      / 2
@@ -102,29 +142,27 @@ def _reba_subscores(landmarks, w: int, h: int) -> dict[str, float]:
     elif trunk_angle < 45:  lumbar = 5.5
     else:                   lumbar = 8.0
 
-    # ── Neck ─────────────────────────────────────────────────────────────────
-    neck_vec   = nose - mid_shoulder
-    neck_angle = float(np.degrees(
-        np.arctan2(abs(neck_vec[0]), abs(neck_vec[1]) + 1e-8)
-    ))
+    # ── Neck: trunk axis extended above the shoulders vs. shoulder->ear midpoint
+    trunk_up   = mid_shoulder + (mid_shoulder - mid_hip)
+    neck_angle = _angle_at_vertex(trunk_up, mid_shoulder, mid_ear)
     if   neck_angle < 10:  neck = 1.0
     elif neck_angle < 20:  neck = 3.0
     else:                  neck = 6.5
 
-    # ── Shoulder / upper arm ─────────────────────────────────────────────────
-    l_arm_angle = _angle_at_vertex(mid_shoulder, l_shoulder, l_elbow)
-    r_arm_angle = _angle_at_vertex(mid_shoulder, r_shoulder, r_elbow)
+    # ── Upper arm: angle between upper arm and trunk (shoulder->hip) ─────────
+    l_arm_angle = _angle_at_vertex(l_hip, l_shoulder, l_elbow)
+    r_arm_angle = _angle_at_vertex(r_hip, r_shoulder, r_elbow)
     arm_angle   = max(l_arm_angle, r_arm_angle)
     if   arm_angle < 20:  shoulder = 1.5
     elif arm_angle < 45:  shoulder = 3.0
     elif arm_angle < 90:  shoulder = 5.5
     else:                 shoulder = 8.0
 
-    # ── Forearm / lower arm ───────────────────────────────────────────────────
+    # ── Lower arm: elbow flexion, 60 to 100 degrees is the neutral REBA band ──
     l_elbow_angle = _angle_at_vertex(l_shoulder, l_elbow, l_wrist)
     r_elbow_angle = _angle_at_vertex(r_shoulder, r_elbow, r_wrist)
-    elbow_angle   = max(l_elbow_angle, r_elbow_angle)
-    forearm = 1.5 if 60 <= elbow_angle <= 100 else 4.5
+    flexion = 180 - max(l_elbow_angle, r_elbow_angle)
+    forearm = 1.5 if 60 <= flexion <= 100 else 4.5
 
     # ── Knee ─────────────────────────────────────────────────────────────────
     l_flex = 180 - _angle_at_vertex(l_hip, l_knee, l_ankle)
@@ -174,6 +212,19 @@ def _overall_reba(subscores: dict[str, float]) -> float:
         for k in _REGION_WEIGHTS
     )
     return round(1.0 + raw * 9.0, 2)
+
+
+def stufe(index: float) -> str:
+    """Level of the posture index (1 to 10), same bands everywhere
+    (docs/HALTUNGSINDEX.md): below 4 low, 4 to below 6 medium, 6 to below 8
+    high, from 8 very high."""
+    if index < 4:
+        return "LOW"
+    if index < 6:
+        return "MEDIUM"
+    if index < 8:
+        return "HIGH"
+    return "VERY_HIGH"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -239,35 +290,51 @@ def _classify_movement(lm, w: int, h: int) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Frame-level anonymisation
+# Anonymisation of the critical frames (E.3.2 of the review on 31.10.2026)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _anonymise_frame(frame: np.ndarray, pose_result) -> np.ndarray:
-    """Draw an opaque grey box over the head region (top 38 % + 20 px pad)."""
-    if not pose_result.pose_landmarks:
-        return frame
+# Up to this many persons per critical frame get their head blacked out
+_MAX_PERSONEN = 6
+# Face boxes of the face detector are enlarged by this factor
+_GESICHT_RAND = 1.6
 
+
+def _kopfbox(lm, w: int, h: int) -> tuple[int, int, int, int]:
+    """Generous box around the head of one person, in pixels.
+
+    Uses all head landmarks (0 to 10, estimated also when hidden). The size
+    is the largest of: 0.75 x shoulder width, 1.5 x head span, 0.45 x trunk
+    length, 4 % of the frame; so it stays large in side view too.
+    """
+    p = np.array([[lm[i].x * w, lm[i].y * h] for i in range(33)])
+    kopf = p[0:11]
+    cx, cy = kopf.mean(axis=0)
+    schultern = np.linalg.norm(p[11] - p[12])
+    spanne = float(np.ptp(kopf, axis=0).max())
+    rumpf = np.linalg.norm((p[11] + p[12]) / 2 - (p[23] + p[24]) / 2)
+    r = max(0.75 * schultern, 1.5 * spanne, 0.45 * rumpf, 0.04 * max(w, h))
+    return (max(0, int(cx - r)), max(0, int(cy - 1.2 * r)), min(w, int(cx + r)), min(h, int(cy + r)))
+
+
+def _gesichtsbox(det, w: int, h: int) -> tuple[int, int, int, int]:
+    bb = det.bounding_box
+    cx, cy = bb.origin_x + bb.width / 2, bb.origin_y + bb.height / 2
+    hw, hh = bb.width * _GESICHT_RAND / 2, bb.height * _GESICHT_RAND / 2
+    return (max(0, int(cx - hw)), max(0, int(cy - hh)), min(w, int(cx + hw)), min(h, int(cy + hh)))
+
+
+def _schwaerzen(frame: np.ndarray, personen, gesichter) -> np.ndarray | None:
+    """Black out the heads of all detected persons and all detected faces.
+
+    Returns None when no person is detected: such a frame is not kept, because
+    nothing guarantees that a face in it is covered (fail closed).
+    """
+    if not personen:
+        return None
     h, w = frame.shape[:2]
-    lm = pose_result.pose_landmarks[0]  # first detected person (Tasks API)
-
-    vis_y = [lm[i].y * h for i in range(33) if (lm[i].visibility or 0) > 0.3]
-    vis_x = [lm[i].x * w for i in range(33) if (lm[i].visibility or 0) > 0.3]
-    if not vis_y:
-        return frame
-
-    p_top    = min(vis_y)
-    p_bottom = max(vis_y)
-    p_left   = min(vis_x)
-    p_right  = max(vis_x)
-    p_height = p_bottom - p_top
-
-    PAD = 20
-    box_top    = max(0, int(p_top)                         - PAD)
-    box_bottom = min(h, int(p_top + 0.38 * p_height)      + PAD)
-    box_left   = max(0, int(p_left)                        - PAD)
-    box_right  = min(w, int(p_right)                       + PAD)
-
-    cv2.rectangle(frame, (box_left, box_top), (box_right, box_bottom), (80, 80, 80), -1)
+    boxen = [_kopfbox(lm, w, h) for lm in personen] + [_gesichtsbox(d, w, h) for d in gesichter]
+    for x0, y0, x1, y1 in boxen:
+        cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 0, 0), -1)
     return frame
 
 
@@ -276,7 +343,7 @@ def _anonymise_frame(frame: np.ndarray, pose_result) -> np.ndarray:
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def run_pipeline(job_id: str, meta: dict | None = None, recorder=None) -> None:
-    """BackgroundTask: anonymise + REBA analysis; write result to GCS."""
+    """BackgroundTask: analysis; write result to GCS."""
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _pipeline_sync, job_id, meta or {}, recorder)
 
@@ -287,7 +354,7 @@ def _pipeline_sync(job_id: str, meta: dict, recorder=None) -> None:
         _run(job_id, meta, recorder)
     except Exception:
         logger.exception("Pipeline failed: %s", job_id)
-        _write_error(job_id, "Analysis pipeline failed — see server logs.")
+        _write_error(job_id, "Die Analyse ist fehlgeschlagen. Bitte versuchen Sie es erneut oder wenden Sie sich an uns.")
     finally:
         _delete_raw(job_id)
 
@@ -305,12 +372,10 @@ def _delete_raw(job_id: str) -> None:
 
 def _run(job_id: str, meta: dict, recorder=None) -> None:
     raw_path = gcs.raw_video_path(job_id)
-    video_bytes = gcs.download_bytes(raw_path)
 
     with tempfile.TemporaryDirectory() as tmp:
         input_path = Path(tmp) / "input.mp4"
-        anon_path  = Path(tmp) / "anon.mp4"
-        input_path.write_bytes(video_bytes)
+        gcs.download_to_file(raw_path, str(input_path))
 
         cap     = cv2.VideoCapture(str(input_path))
         fps     = cap.get(cv2.CAP_PROP_FPS) or 25.0
@@ -320,18 +385,15 @@ def _run(job_id: str, meta: dict, recorder=None) -> None:
         if recorder is not None:
             recorder.start(fps, frame_w, frame_h)
 
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter(str(anon_path), fourcc, fps, (frame_w, frame_h))
-
-        _ensure_model()
         options = PoseLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=str(_MODEL_PATH)),
+            base_options=BaseOptions(model_asset_path=str(_ensure_model("pose"))),
             running_mode=vision.RunningMode.IMAGE,
         )
         landmarker = PoseLandmarker.create_from_options(options)
 
         sampled: list[dict] = []
         frame_idx = 0
+        proben = 0  # sample points, with or without a detected person
         sample_interval = max(1, int(fps))  # ~1 sample per second
 
         while True:
@@ -344,9 +406,9 @@ def _run(job_id: str, meta: dict, recorder=None) -> None:
             result   = landmarker.detect(mp_image)
             if recorder is not None:
                 recorder.add(frame_idx, result)
-            frame    = _anonymise_frame(frame, result)
-            writer.write(frame)
 
+            if frame_idx % sample_interval == 0:
+                proben += 1
             if frame_idx % sample_interval == 0 and result.pose_landmarks:
                 lm      = result.pose_landmarks[0]  # first detected person
                 scores  = _reba_subscores(lm, frame_w, frame_h)
@@ -369,19 +431,16 @@ def _run(job_id: str, meta: dict, recorder=None) -> None:
             frame_idx += 1
 
         cap.release()
-        writer.release()
         landmarker.close()
 
-        # Push anonymised video to GCS
-        anon_bytes = anon_path.read_bytes()
-        gcs.upload_bytes(
-            f"{settings.RESULTS_PREFIX}{job_id}/video_anon.mp4",
-            anon_bytes,
-            "video/mp4",
-        )
+        erkennung = len(sampled) / proben if proben else 0.0
+        fehler = _erkennung_fehler(erkennung)
+        if fehler:
+            _write_error(job_id, fehler)
+            return
 
-        # Extract top-3 critical frames while anon_path is still on disk
-        critical_frames = _extract_critical_frames(job_id, sampled, anon_path)
+        # Critical frames from the original video while it is still on disk
+        critical_frames = _extract_critical_frames(job_id, sampled, input_path)
 
     # frame_idx counts every decoded frame, with or without a detected person
     duration_s = frame_idx / fps
@@ -389,13 +448,26 @@ def _run(job_id: str, meta: dict, recorder=None) -> None:
         _save_pose(job_id, recorder)
 
     result = _aggregate(job_id, sampled, duration_s, meta)
+    result["erkennung_anteil"] = round(erkennung, 3)
     result["critical_frames"] = critical_frames
     gcs.upload_bytes(
         f"{settings.RESULTS_PREFIX}{job_id}/result.json",
         json.dumps(result).encode(),
         "application/json",
     )
-    logger.info("Pipeline done: %s  REBA=%.1f", job_id, result["reba_score"])
+    logger.info("Pipeline done: %s  index=%.1f", job_id, result["reba_score"])
+
+
+def _erkennung_fehler(anteil: float) -> str | None:
+    """Message for the dashboard when too few frames show a person (E.3.5)."""
+    if anteil == 0:
+        return ("Im Video wurde keine Person erkannt. Bitte prüfen Sie die Aufnahme: "
+                "ganze Person im Bild, fest stehende Kamera, gutes Licht.")
+    if anteil < settings.ANALYSE_MIN_ERKENNUNG:
+        return (f"Die Person wurde nur in {anteil * 100:.0f} % der Aufnahme erkannt. "
+                "Für eine belastbare Auswertung bitte neu aufnehmen: ganze Person im Bild, "
+                "fest stehende Kamera, gutes Licht.")
+    return None
 
 
 def _save_pose(job_id: str, recorder) -> None:
@@ -415,9 +487,7 @@ def _save_pose(job_id: str, recorder) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _aggregate(job_id: str, sampled: list[dict], duration_s: float, meta: dict) -> dict:
-    if not sampled:
-        return _empty_result(job_id, meta)
-
+    """sampled: at least one frame with a detected person (_erkennung_fehler)."""
     reba_vals = [f["reba"] for f in sampled]
     avg_reba  = float(np.mean(reba_vals))
 
@@ -454,20 +524,16 @@ def _aggregate(job_id: str, sampled: list[dict], duration_s: float, meta: dict) 
         for m, vs in sorted(by_minute.items())
     ]
 
-    # REBA level
-    if   avg_reba <= 4: level = "LOW"
-    elif avg_reba <= 6: level = "MEDIUM"
-    elif avg_reba <= 8: level = "HIGH"
-    else:               level = "VERY_HIGH"
+    level = stufe(avg_reba)
 
     return {
         "job_id":             job_id,
         "company_name":       meta.get("company_name"),
         "department":         meta.get("department"),
         "task_description":   meta.get("task_description"),
-        "worker_height_cm":   meta.get("worker_height_cm"),
         "shift_duration_min": shift_min,
         "reba_score":         round(avg_reba, 2),
+        "reba_max":           round(max(reba_vals), 2),
         "reba_level":         level,
         "body_regions":       region_avgs,
         "movements": {
@@ -499,15 +565,13 @@ def _build_action_items(regions: dict[str, float], bend_pct: float, over_pct: fl
             "priority":      "CRITICAL",
             "region":        "Lendenwirbel",
             "text":          f"Erhöhter Rumpfbeuge-Anteil ({bend_pct:.0f} % der Schichtzeit). "
-                             "Arbeitshöhe auf Ellbogenniveau anpassen.",
-            "reduction_pct": 40,
+                             "Arbeitshöhe auf Ellbogenniveau anpassen."
         })
     elif lumbar > 3:
         items.append({
             "priority":      "MEDIUM",
             "region":        "Lendenwirbel",
-            "text":          "Moderate Lendenbelastung. Regelmäßige Entlastungspausen empfohlen.",
-            "reduction_pct": 20,
+            "text":          "Moderate Lendenbelastung. Regelmäßige Entlastungspausen empfohlen."
         })
 
     neck = regions.get("neck", 0)
@@ -515,15 +579,13 @@ def _build_action_items(regions: dict[str, float], bend_pct: float, over_pct: fl
         items.append({
             "priority":      "CRITICAL",
             "region":        "Nacken",
-            "text":          "Anhaltende Nackenbeugehaltung erkannt. Bildschirm- oder Materialhöhe prüfen.",
-            "reduction_pct": 35,
+            "text":          "Anhaltende Nackenbeugehaltung erkannt. Bildschirm- oder Materialhöhe prüfen."
         })
     elif neck > 2:
         items.append({
             "priority":      "MEDIUM",
             "region":        "Nacken",
-            "text":          "Nackenhaltung auffällig. Arbeitsoberfläche um 5–10 cm anheben.",
-            "reduction_pct": 15,
+            "text":          "Nackenhaltung auffällig. Arbeitsoberfläche anheben, bis der Blick ohne Beugen des Nackens auf das Werkstück fällt."
         })
 
     shoulder = max(regions.get("shoulder_l", 0), regions.get("shoulder_r", 0))
@@ -532,92 +594,92 @@ def _build_action_items(regions: dict[str, float], bend_pct: float, over_pct: fl
             "priority":      "CRITICAL" if over_pct > 20 else "MEDIUM",
             "region":        "Schulter",
             "text":          f"Überkopfarbeit: {over_pct:.0f} % der Schichtzeit. "
-                             "Arbeitsmittel in Greifhöhe bringen.",
-            "reduction_pct": 50,
+                             "Arbeitsmittel in Greifhöhe bringen."
         })
 
     if regions.get("forearm", 0) > 3.5:
         items.append({
             "priority":      "MEDIUM",
             "region":        "Unterarm",
-            "text":          "Ungünstige Unterarmhaltung erkannt. Stützvorrichtungen prüfen.",
-            "reduction_pct": 25,
+            "text":          "Ungünstige Unterarmhaltung erkannt. Stützvorrichtungen prüfen."
         })
 
     items.sort(key=lambda x: 0 if x["priority"] == "CRITICAL" else 1)
     return items
 
 
-def _empty_result(job_id: str, meta: dict | None = None) -> dict:
-    m = meta or {}
-    return {
-        "job_id":             job_id,
-        "company_name":       m.get("company_name"),
-        "department":         m.get("department"),
-        "task_description":   m.get("task_description"),
-        "worker_height_cm":   m.get("worker_height_cm"),
-        "shift_duration_min": int(m.get("shift_duration_min") or 0),
-        "reba_score":         1.0,
-        "reba_level":         "LOW",
-        "body_regions":       {k: 1.0 for k in _REGION_MAX},
-        "movements": {
-            "bending":  {"pct": 0.0, "minutes": 0.0},
-            "overhead": {"pct": 0.0, "minutes": 0.0},
-            "neutral":  {"pct": 100.0, "minutes": 0.0},
-        },
-        "arms_above_shoulder": {
-            "threshold_deg": settings.ARM_ELEVATION_DEG, "pct": 0.0, "minutes": 0.0, "max_deg": 0.0,
-        },
-        "timeline":         [],
-        "timeline_frames":  [],
-        "critical_frames":  [],
-        "action_items":     [],
-    }
-
-
 def _extract_critical_frames(
     job_id: str,
     sampled: list[dict],
-    anon_path: Path,
+    video_path: Path,
 ) -> list[dict]:
-    """Extract top-3 REBA frames from the anonymised video, overlay timestamp, upload to GCS."""
+    """Top-3 frames by posture index from the original video, heads and faces
+    of all persons blacked out (_schwaerzen); frames without detection are
+    dropped. Timestamp and value overlaid, uploaded to GCS."""
     if not sampled:
         return []
 
     top3 = sorted(sampled, key=lambda f: f["reba"], reverse=True)[:3]
-    cap  = cv2.VideoCapture(str(anon_path))
+    try:
+        personen_lm = PoseLandmarker.create_from_options(PoseLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=str(_ensure_model("pose"))),
+            running_mode=vision.RunningMode.IMAGE,
+            num_poses=_MAX_PERSONEN,
+            min_pose_detection_confidence=0.3,
+        ))
+        gesichter_det = FaceDetector.create_from_options(FaceDetectorOptions(
+            base_options=BaseOptions(model_asset_path=str(_ensure_model("face"))),
+            running_mode=vision.RunningMode.IMAGE,
+            min_detection_confidence=0.3,
+        ))
+    except Exception:
+        # without detectors no frame is anonymised safely, so none is kept
+        logger.exception("Detectors for the critical frames unavailable: %s", job_id)
+        return []
+
+    cap = cv2.VideoCapture(str(video_path))
     result: list[dict] = []
+    try:
+        for fd in top3:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, fd["frame"])
+            ret, frame = cap.read()
+            if not ret:
+                continue
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            personen = personen_lm.detect(mp_image).pose_landmarks
+            gesichter = gesichter_det.detect(mp_image).detections
+            frame = _schwaerzen(frame, personen, gesichter)
+            if frame is None:
+                continue
 
-    for rank, fd in enumerate(top3, start=1):
-        cap.set(cv2.CAP_PROP_POS_FRAMES, fd["frame"])
-        ret, frame = cap.read()
-        if not ret:
-            continue
+            sec   = fd["second"]
+            # Hershey fonts know ASCII only
+            label = f"{int(sec // 60):02d}:{int(sec % 60):02d}   Haltungsindex {fd['reba']:.1f}".replace(".", ",")
+            cv2.putText(
+                frame, label, (10, 35),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                (255, 255, 255), 2, cv2.LINE_AA,
+            )
 
-        sec   = fd["second"]
-        label = f"{int(sec // 60):02d}:{int(sec % 60):02d} \u00b7 REBA {fd['reba']:.1f}"
-        cv2.putText(
-            frame, label, (10, 35),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.9,
-            (255, 255, 255), 2, cv2.LINE_AA,
-        )
+            ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            if not ok:
+                continue
 
-        ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-        if not ok:
-            continue
-
-        filename = f"critical_{rank}.jpg"
-        gcs_path = f"{settings.RESULTS_PREFIX}{job_id}/frames/{filename}"
-        gcs.upload_bytes(gcs_path, buf.tobytes(), "image/jpeg")
-        result.append({
-            "rank":     rank,
-            "second":   round(sec, 1),
-            "reba":     fd["reba"],
-            "movement": fd["movement"],
-            "gcs_path": gcs_path,
-        })
-
-    cap.release()
+            rank     = len(result) + 1
+            filename = f"critical_{rank}.jpg"
+            gcs_path = f"{settings.RESULTS_PREFIX}{job_id}/frames/{filename}"
+            gcs.upload_bytes(gcs_path, buf.tobytes(), "image/jpeg")
+            result.append({
+                "rank":     rank,
+                "second":   round(sec, 1),
+                "reba":     fd["reba"],
+                "movement": fd["movement"],
+                "gcs_path": gcs_path,
+            })
+    finally:
+        cap.release()
+        personen_lm.close()
+        gesichter_det.close()
     return result
 
 

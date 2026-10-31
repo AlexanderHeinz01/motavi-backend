@@ -156,7 +156,7 @@ RESULT = {"shift_duration_min": 480, "reba_score": 6.2, "critical_frames": [{"re
 
 @pytest.fixture
 def store():
-    data: dict = {}
+    data: dict = {"results/11111111-1111-4111-8111-111111111111/job.json": {"job_id": "11111111-1111-4111-8111-111111111111", "erstellt_von": "user@example.org", "status": "processing"}}
     with patch("backend.app.routers.workplace.gcs.download_bytes", return_value=b"npz"), \
          patch("backend.app.routers.workplace.load_npz", side_effect=lambda b: b), \
          patch("backend.app.routers.workplace.prepare", return_value=PREP), \
@@ -178,15 +178,15 @@ def clear_overrides():
 
 def test_api_without_login_401(monkeypatch):
     monkeypatch.setattr(auth_router.settings, "JWT_SECRET", "test")
-    for path in ("/api/v1/workplace/job/pdf", "/api/v1/workplace/job/export"):
+    for path in ("/api/v1/workplace/11111111-1111-4111-8111-111111111111/pdf", "/api/v1/workplace/11111111-1111-4111-8111-111111111111/export"):
         assert client.get(path).status_code == 401
-    assert client.put("/api/v1/workplace/job/empfehlung", json={"empfehlung_id": "keep"}).status_code == 401
+    assert client.put("/api/v1/workplace/11111111-1111-4111-8111-111111111111/empfehlung", json={"empfehlung_id": "keep"}).status_code == 401
 
 
 def test_api_confirmation_only_for_consultants(store):
     as_user("user")
-    r = client.put("/api/v1/workplace/job/empfehlung", json={"empfehlung_id": "keep"})
-    assert r.status_code == 403 and store == {}
+    r = client.put("/api/v1/workplace/11111111-1111-4111-8111-111111111111/empfehlung", json={"empfehlung_id": "keep"})
+    assert r.status_code == 403 and list(store) == ["results/11111111-1111-4111-8111-111111111111/job.json"]
 
 
 @pytest.mark.parametrize("body", [
@@ -196,28 +196,57 @@ def test_api_confirmation_only_for_consultants(store):
 ])
 def test_api_confirmation_invalid_422(store, body):
     as_user("berater")
-    assert client.put("/api/v1/workplace/job/empfehlung", json=body).status_code == 422
-    assert "results/job/empfehlung.json" not in store
+    assert client.put("/api/v1/workplace/11111111-1111-4111-8111-111111111111/empfehlung", json=body).status_code == 422
+    assert "results/11111111-1111-4111-8111-111111111111/empfehlung.json" not in store
 
 
 def test_api_confirmation_saved(store):
     as_user("berater")
-    r = client.put("/api/v1/workplace/job/empfehlung", json={"empfehlung_id": "automate", "typ_id": "pick_and_place", "kommentar": "passt"})
+    r = client.put("/api/v1/workplace/11111111-1111-4111-8111-111111111111/empfehlung", json={"empfehlung_id": "automate", "typ_id": "pick_and_place", "kommentar": "passt"})
     assert r.status_code == 200, r.text
-    saved = store["results/job/empfehlung.json"]
+    saved = store["results/11111111-1111-4111-8111-111111111111/empfehlung.json"]
     assert saved["bestaetigt_von"] == "berater@example.org" and saved["typ_id"] == "pick_and_place"
     assert saved["vorschlag_id"] == r.json()["empfehlung"]["vorschlag_id"]
     as_user("user")
-    doc = client.get("/api/v1/workplace/job").json()
+    doc = client.get("/api/v1/workplace/11111111-1111-4111-8111-111111111111").json()
     assert doc["empfehlung"]["status"] == "bestaetigt" and doc["empfehlung"]["kommentar"] == "passt"
     assert doc["arbeitsplatz"] == "Montage · Baugruppe A"
 
 
+def test_confirmed_steckbrief_frozen(store):
+    """E.2.14: after the confirmation it is served from steckbrief.json, also
+    when pose.npz has been deleted, and reading it writes nothing."""
+    as_user("berater")
+    doc = client.put("/api/v1/workplace/11111111-1111-4111-8111-111111111111/empfehlung", json={"empfehlung_id": "keep"}).json()
+    assert store["results/11111111-1111-4111-8111-111111111111/steckbrief.json"] == doc
+    vorher = dict(store)
+    with patch("backend.app.routers.workplace.gcs.download_bytes", side_effect=FileNotFoundError):
+        r = client.get("/api/v1/workplace/11111111-1111-4111-8111-111111111111")
+        assert r.status_code == 200 and r.json() == doc
+        assert client.get("/api/v1/workplace/11111111-1111-4111-8111-111111111111/pdf").status_code == 200
+    assert store == vorher
+
+
+def test_change_after_confirmation_freezes_again(store):
+    as_user("berater")
+    client.put("/api/v1/workplace/11111111-1111-4111-8111-111111111111/empfehlung", json={"empfehlung_id": "keep"})
+    doc = client.put("/api/v1/workplace/11111111-1111-4111-8111-111111111111/inputs", json={"anzahl_varianten": 3}).json()
+    assert store["results/11111111-1111-4111-8111-111111111111/steckbrief.json"] == doc
+    assert doc["kundenangaben"]["anzahl_varianten"] == 3
+
+
+def test_foreign_user_sees_no_job(store):
+    app.dependency_overrides[auth_router.get_current_user] = lambda: {"email": "andere@example.org", "role": "user"}
+    for path in ("", "/pdf", "/export"):
+        assert client.get(f"/api/v1/workplace/11111111-1111-4111-8111-111111111111{path}").status_code == 404
+    assert client.put("/api/v1/workplace/11111111-1111-4111-8111-111111111111/inputs", json={}).status_code == 404
+
+
 def test_api_pdf_and_export(store):
     as_user("user")
-    r = client.get("/api/v1/workplace/job/pdf")
+    r = client.get("/api/v1/workplace/11111111-1111-4111-8111-111111111111/pdf")
     assert r.status_code == 200 and r.headers["content-type"] == "application/pdf"
-    assert 'filename="motavi-steckbrief-job.pdf"' in r.headers["content-disposition"] and pages(r.content) == 2
-    r = client.get("/api/v1/workplace/job/export")
+    assert 'filename="motavi-steckbrief-11111111.pdf"' in r.headers["content-disposition"] and pages(r.content) == 2
+    r = client.get("/api/v1/workplace/11111111-1111-4111-8111-111111111111/export")
     assert r.status_code == 200 and r.headers["content-type"].startswith("application/json")
     assert errors(r.json()) == []

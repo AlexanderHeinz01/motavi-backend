@@ -83,17 +83,27 @@ def analyse_twist(prep: Prepared, zyklen: ZyklusErgebnis | None, cfg: BelastungC
     return anteil, pro_zyklus
 
 
-def from_result(result: dict) -> dict[str, Kennzahl]:
-    """REBA and movement shares of the ergonomics pipeline (result.json)."""
+def from_result(result: dict, cfg: BelastungConfig = BelastungConfig()) -> dict[str, Kennzahl]:
+    """Posture index (field names reba_*) and movement shares of the
+    ergonomics pipeline (result.json). Quality: share of sampled frames with
+    a detected person (erkennung_anteil, from 31.10.2026; older results 1.0)."""
     out: dict[str, Kennzahl] = {}
+    q = float(result.get("erkennung_anteil", 1.0))
+
+    def kz(wert: float) -> Kennzahl:
+        return Kennzahl.bewertet(wert, q, cfg.reliable)
+
     reba = result.get("reba_score")
-    out["reba_mittel"] = Kennzahl(float(reba), 1.0, True) if reba is not None else Kennzahl.fehlt("Kein Ergonomie-Ergebnis")
-    peaks = [f.get("reba") for f in result.get("critical_frames") or [] if f.get("reba") is not None]
-    out["reba_max"] = Kennzahl(float(max(peaks)), 1.0, True) if peaks else Kennzahl.fehlt("Keine kritischen Momente gespeichert")
+    out["reba_mittel"] = kz(float(reba)) if reba is not None else Kennzahl.fehlt("Kein Ergonomie-Ergebnis")
+    spitze = result.get("reba_max")
+    if spitze is None:
+        peaks = [f.get("reba") for f in result.get("critical_frames") or [] if f.get("reba") is not None]
+        spitze = max(peaks) if peaks else None
+    out["reba_max"] = kz(float(spitze)) if spitze is not None else Kennzahl.fehlt("Keine kritischen Momente gespeichert")
     moves = result.get("movements") or {}
     for key, name in (("buecken_anteil", "bending"), ("ueberkopf_anteil", "overhead")):
         pct = (moves.get(name) or {}).get("pct")
-        out[key] = Kennzahl(float(pct) / 100.0, 1.0, True) if pct is not None else Kennzahl.fehlt("Kein Ergonomie-Ergebnis")
+        out[key] = kz(float(pct) / 100.0) if pct is not None else Kennzahl.fehlt("Kein Ergonomie-Ergebnis")
     return out
 
 

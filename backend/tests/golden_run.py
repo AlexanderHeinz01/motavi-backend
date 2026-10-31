@@ -46,6 +46,20 @@ class _FakeLandmarker:
         pass
 
 
+class _FakeFaceDetector:
+    """No faces; the heads are blacked out from the pose landmarks."""
+
+    @classmethod
+    def create_from_options(cls, _options):
+        return cls()
+
+    def detect(self, _image):
+        return type("Faces", (), {"detections": []})()
+
+    def close(self) -> None:
+        pass
+
+
 #: paths deleted in the last run (raw video)
 deleted: list[str] = []
 
@@ -58,14 +72,15 @@ def run(analyzer, gcs, recorder=None, *, full: bool = False, fail_at: int | None
     """
     store: dict[str, bytes] = {}
     deleted.clear()
-    saved = (analyzer.PoseLandmarker, analyzer._ensure_model, gcs.download_bytes, gcs.upload_bytes, getattr(gcs, "delete_blob", None))
+    saved = (analyzer.PoseLandmarker, analyzer.FaceDetector, analyzer._ensure_model, gcs.download_to_file, gcs.upload_bytes, getattr(gcs, "delete_blob", None))
     with tempfile.TemporaryDirectory() as tmp:
         video = Path(tmp) / "video.mp4"
         synthetic_video(video)
         try:
             analyzer.PoseLandmarker = type("Landmarker", (_FakeLandmarker,), {"fail_at": fail_at})
-            analyzer._ensure_model = lambda: None
-            gcs.download_bytes = lambda p: video.read_bytes() if p.endswith("/video.mp4") else store[p]
+            analyzer.FaceDetector = _FakeFaceDetector
+            analyzer._ensure_model = lambda name="pose": None
+            gcs.download_to_file = lambda p, dest: Path(dest).write_bytes(video.read_bytes())
             gcs.upload_bytes = lambda p, data, ct=None: store.__setitem__(p, data)
             gcs.delete_blob = lambda p: deleted.append(p) or True
             if full:
@@ -75,7 +90,7 @@ def run(analyzer, gcs, recorder=None, *, full: bool = False, fail_at: int | None
             else:
                 analyzer._run("golden", {}, recorder)
         finally:
-            analyzer.PoseLandmarker, analyzer._ensure_model, gcs.download_bytes, gcs.upload_bytes, delete = saved
+            analyzer.PoseLandmarker, analyzer.FaceDetector, analyzer._ensure_model, gcs.download_to_file, gcs.upload_bytes, delete = saved
             if delete is None:
                 del gcs.delete_blob
             else:

@@ -1,4 +1,5 @@
 """POST /api/v1/contact (WEBSITE_PLAN Phase 6): validation, honeypot, rate limit, storage, e-mail."""
+import ssl
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -94,16 +95,61 @@ def test_speichern_sets_retention(monkeypatch):
     assert (doc["loeschen_am"] - doc["eingegangen_am"]).days == 365 and len(anfrage_id) == 32
 
 
-def test_mail_only_when_configured(monkeypatch):
-    daten = {**HERSTELLER, "website": None}
+def test_mail_only_when_configured_and_without_content(monkeypatch):
     monkeypatch.setattr(settings, "SMTP_HOST", "")
-    assert kontakt.benachrichtigen("id", daten) is False
+    assert kontakt.benachrichtigen("id", "hersteller") is False
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.example.org")
     monkeypatch.setattr(settings, "SMTP_FROM", "website@example.org")
     monkeypatch.setattr(settings, "CONTACT_NOTIFY_TO", "vertrieb@example.org")
     with patch("backend.app.services.kontakt.smtplib.SMTP") as smtp:
-        assert kontakt.benachrichtigen("id", daten) is True
-        msg = smtp.return_value.__enter__.return_value.send_message.call_args.args[0]
-    assert "Beispiel GmbH (Hersteller)" in msg["Subject"] and msg["Reply-To"] == daten["email"]
+        assert kontakt.benachrichtigen("id", "hersteller") is True
+        verbindung = smtp.return_value.__enter__.return_value
+        msg = verbindung.send_message.call_args.args[0]
+        # certificate is checked (E.3.8)
+        kontext = verbindung.starttls.call_args.kwargs["context"]
+        assert kontext.verify_mode == ssl.CERT_REQUIRED and kontext.check_hostname
+    # only a notice, no personal data (E.3.7)
+    assert msg["Subject"] == "Neue Pilot-Anfrage (Hersteller)" and msg["Reply-To"] is None
+    text = msg.get_content()
+    assert "id" in text and HERSTELLER["email"] not in text and "Beispiel GmbH" not in text
     with patch("backend.app.services.kontakt.smtplib.SMTP", side_effect=OSError("kein Server")):
-        assert kontakt.benachrichtigen("id", daten) is False  # logged, request still counts
+        assert kontakt.benachrichtigen("id", "hersteller") is False  # logged, request still counts
+
+
+def test_rate_limit_not_bypassed_by_forged_header():
+    """E.3.9: the sender controls the first entries, Cloud Run appends the real address."""
+    with patch("backend.app.routers.kontakt.kontakt.speichern", return_value="x"):
+        for i in range(5):
+            h = {"X-Forwarded-For": f"10.0.0.{i}, 203.0.113.9"}
+            assert client.post("/api/v1/contact", json=ANBIETER, headers=h).status_code == 202
+        h = {"X-Forwarded-For": "10.9.9.9, 203.0.113.9"}
+        assert client.post("/api/v1/contact", json=ANBIETER, headers=h).status_code == 429
+
+
+def test_rate_limit_keys():
+    assert kontakt.ip_schluessel("2001:db8::1") == kontakt.ip_schluessel("2001:db8::ffff") == "2001:db8::/64"
+    assert kontakt.ip_schluessel("x" * 4000) == "ungueltig"
+    rl = kontakt.RateLimiter(max_keys=3)
+    for i in range(10):
+        rl.erlaubt(f"k{i}", 5, 60, jetzt=0)
+    assert len(rl) == 3
+    rl.erlaubt("k9", 5, 60, jetzt=100)  # window over: empty, removed... then counted again
+    assert len(rl) == 3
+
+
+@pytest.mark.parametrize("feld,wert", [
+    ("unternehmen", "Beispiel\r\nBcc: x@evil.com"),
+    ("name", "Erika\x00"),
+    ("email", "a,b@evil.com"),
+    ("email", "a<b>@c.de"),
+    ("nachricht", "Hallo\x07"),
+])
+def test_control_characters_and_address_lists_rejected(feld, wert):
+    with patch("backend.app.routers.kontakt.kontakt.speichern") as speichern:
+        assert client.post("/api/v1/contact", json={**HERSTELLER, feld: wert}).status_code == 422
+    speichern.assert_not_called()
+
+
+def test_message_may_have_line_breaks():
+    with patch("backend.app.routers.kontakt.kontakt.speichern", return_value="x"):
+        assert client.post("/api/v1/contact", json={**HERSTELLER, "nachricht": "Zeile 1\nZeile 2"}).status_code == 202

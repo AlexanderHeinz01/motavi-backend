@@ -1,6 +1,6 @@
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
@@ -10,7 +10,7 @@ class LoginRequest(BaseModel):
 
 class RegisterRequest(BaseModel):
     email: str
-    password: str
+    password: str = Field(min_length=12, max_length=200)
     name: Optional[str] = None
     company: Optional[str] = None
     # "berater" may review process steps (expert view); registration needs the setup key

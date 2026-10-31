@@ -3,12 +3,14 @@ import { useRef, useState, type DragEvent } from 'react'
 interface Props {
   onFile: (file: File) => void
   disabled?: boolean
+  /** largest file; same as UPLOAD_MAX_BYTES in the backend */
+  maxBytes?: number
 }
 
 const ACCEPT = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo']
-const MAX_BYTES = 500 * 1024 * 1024
+const MAX_BYTES = 1024 * 1024 * 1024
 
-export default function UploadZone({ onFile, disabled }: Props) {
+export default function UploadZone({ onFile, disabled, maxBytes = MAX_BYTES }: Props) {
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -19,8 +21,8 @@ export default function UploadZone({ onFile, disabled }: Props) {
       setError('Nicht unterstütztes Format. Bitte MP4, WebM, MOV oder AVI verwenden.')
       return
     }
-    if (file.size > MAX_BYTES) {
-      setError('Datei zu groß (max. 500 MB).')
+    if (file.size > maxBytes) {
+      setError(`Datei zu groß (höchstens ${Math.round(maxBytes / 1024 / 1024)} MB).`)
       return
     }
     onFile(file)
@@ -64,7 +66,7 @@ export default function UploadZone({ onFile, disabled }: Props) {
             {dragging ? 'Datei hier ablegen' : 'Video hier ablegen oder klicken'}
           </p>
           <p className="font-body text-sm text-neutral/50">
-            MP4 · WebM · MOV · AVI — max. 500 MB
+            MP4 · WebM · MOV · AVI, höchstens {Math.round(maxBytes / 1024 / 1024)} MB
           </p>
         </div>
 

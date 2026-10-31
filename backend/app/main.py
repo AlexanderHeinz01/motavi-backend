@@ -4,19 +4,40 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from .routers import analysis, auth, kontakt, report, upload, workplace
+from .config import settings
+from .routers import analysis, auth, kontakt, report, upload, upload_links, workplace
 
-app = FastAPI(title="Motavi API", version="0.2.0")
+app = FastAPI(title="Motavi API", version="0.3.0")
 
+
+def pruefe_produktion(cfg=settings) -> None:
+    """Refuse to start in production without the secrets that sign-in and
+    upload links depend on (E.3.12 of the review on 31.10.2026)."""
+    if cfg.APP_ENV != "production":
+        return
+    if len(cfg.JWT_SECRET.encode()) < 32:
+        raise RuntimeError("JWT_SECRET fehlt oder ist kürzer als 32 Byte (Secret Manager, docs/BETRIEB.md).")
+    if not cfg.PUBLIC_APP_URL.startswith("https://"):
+        raise RuntimeError("PUBLIC_APP_URL fehlt (https-Adresse des Dienstes für Upload-Links).")
+    if not cfg.CORS_ORIGINS:
+        raise RuntimeError("CORS_ORIGINS fehlt (Adresse der Website für das Kontaktformular).")
+
+
+@app.on_event("startup")
+def _start() -> None:
+    pruefe_produktion()
+
+_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins or ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(auth.router,     prefix="/api/v1")
 app.include_router(upload.router,   prefix="/api/v1")
+app.include_router(upload_links.router, prefix="/api/v1")
 app.include_router(analysis.router, prefix="/api/v1")
 app.include_router(report.router,   prefix="/api/v1")
 app.include_router(workplace.router, prefix="/api/v1")

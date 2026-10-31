@@ -1,7 +1,7 @@
 /**
- * SVG semicircle gauge for the REBA score (1 to 15).
- * Background zones and label follow the REBA action levels (lib/rebaStufe.ts),
- * the same as on the website and in the PDF report.
+ * SVG semicircle gauge for the posture index based on REBA (1 to 10).
+ * Background zones and label follow the levels in lib/rebaStufe.ts, the same
+ * as on the website and in the PDF report.
  * Active arc fills from left (score 1) clockwise to current score.
  */
 import { REBA_MAX, REBA_STUFEN, rebaStufe, rebaText } from '../lib/rebaStufe'
@@ -27,7 +27,7 @@ function arc(a1: number, a2: number): string {
   return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`
 }
 
-/** Map score (1 to 15, the REBA scale) to angle: score 1 → 180°, score 15 → 0°. */
+/** Map index (1 to 10) to angle: 1 → 180°, 10 → 0°. */
 function scoreAngle(score: number): number {
   return 180 - ((Math.max(1, Math.min(REBA_MAX, score)) - 1) / (REBA_MAX - 1)) * 180
 }
@@ -45,7 +45,7 @@ export default function REBAGauge({ score }: Props) {
 
   return (
     <svg viewBox="0 0 300 185" xmlns="http://www.w3.org/2000/svg" className="w-full max-w-xs mx-auto"
-      role="img" aria-label={`REBA-Score ${rebaText(score)} von ${REBA_MAX}: ${stufe}, ${massnahme}`}>
+      role="img" aria-label={`Haltungsindex ${rebaText(score)} von ${REBA_MAX}: ${stufe}, ${massnahme}`}>
       {/* Shadow / track */}
       <path d={trackPath} stroke="#0f1830" strokeWidth={26} fill="none" strokeLinecap="round" />
 

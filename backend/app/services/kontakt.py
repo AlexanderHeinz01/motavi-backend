@@ -6,12 +6,14 @@ after CONTACT_RETENTION_DAYS without further action.
 """
 from __future__ import annotations
 
+import ipaddress
 import logging
 import smtplib
+import ssl
 import threading
 import time
 import uuid
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
@@ -22,23 +24,45 @@ logger = logging.getLogger(__name__)
 _COLLECTION = "kontaktanfragen"
 
 
-class RateLimiter:
-    """Sliding window per key, in memory (per instance; enough against simple floods)."""
+def ip_schluessel(adresse: str) -> str:
+    """Rate limit key of an address: IPv4 as is, IPv6 per /64 network (one
+    connection usually has a whole /64). Anything else counts together."""
+    try:
+        ip = ipaddress.ip_address(adresse)
+    except ValueError:
+        return "ungueltig"
+    if ip.version == 6:
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip)
 
-    def __init__(self) -> None:
-        self._hits: dict[str, deque] = defaultdict(deque)
+
+class RateLimiter:
+    """Sliding window per key, in memory (per instance; enough against simple
+    floods). At most max_keys keys; the least recently used go first, empty
+    windows are removed, so memory stays bounded."""
+
+    def __init__(self, max_keys: int = 10_000) -> None:
+        self._hits: OrderedDict[str, deque] = OrderedDict()
         self._lock = threading.Lock()
+        self.max_keys = max_keys
 
     def erlaubt(self, key: str, limit: int, fenster_s: float, jetzt: float | None = None) -> bool:
         t = time.monotonic() if jetzt is None else jetzt
         with self._lock:
-            q = self._hits[key]
+            q = self._hits.pop(key, None) or deque()
             while q and q[0] <= t - fenster_s:
                 q.popleft()
-            if len(q) >= limit:
-                return False
-            q.append(t)
-            return True
+            erlaubt = len(q) < limit
+            if erlaubt:
+                q.append(t)
+            if q:
+                self._hits[key] = q  # most recently used at the end
+            while len(self._hits) > self.max_keys:
+                self._hits.popitem(last=False)
+            return erlaubt
+
+    def __len__(self) -> int:
+        return len(self._hits)
 
     def reset(self) -> None:
         with self._lock:
@@ -64,20 +88,33 @@ def speichern(daten: dict) -> str:
 ZIELGRUPPE_TEXT = {"hersteller": "Hersteller", "anbieter": "Robotik-Anbieter oder Integrator"}
 
 
-def benachrichtigen(anfrage_id: str, daten: dict) -> bool:
-    """E-mail to CONTACT_NOTIFY_TO if SMTP is configured; failures are logged, not raised."""
+def benachrichtigen(anfrage_id: str, zielgruppe: str) -> bool:
+    """Notice to CONTACT_NOTIFY_TO if SMTP is configured; failures are logged, not raised.
+
+    Without the content of the request (decision on 31.10.2026): no personal
+    data in mailboxes outside the 365 days; the request is read in Firestore.
+    """
     if not (settings.SMTP_HOST and settings.CONTACT_NOTIFY_TO and settings.SMTP_FROM):
         return False
-    msg = EmailMessage()
-    msg["Subject"] = f"Pilot-Anfrage: {daten['unternehmen']} ({ZIELGRUPPE_TEXT[daten['zielgruppe']]})"
-    msg["From"] = settings.SMTP_FROM
-    msg["To"] = settings.CONTACT_NOTIFY_TO
-    msg["Reply-To"] = daten["email"]
-    zeilen = [f"{k}: {v}" for k, v in daten.items() if v not in (None, [], "")]
-    msg.set_content("\n".join([f"Anfrage {anfrage_id}", "", *zeilen]))
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as s:
-            s.starttls()
+        msg = EmailMessage()
+        msg["Subject"] = f"Neue Pilot-Anfrage ({ZIELGRUPPE_TEXT.get(zielgruppe, 'Website')})"
+        msg["From"] = settings.SMTP_FROM
+        msg["To"] = settings.CONTACT_NOTIFY_TO
+        msg.set_content(
+            "Über die Website ist eine neue Anfrage eingegangen.\n\n"
+            f"Firestore, Sammlung {_COLLECTION}, Dokument {anfrage_id}\n\n"
+            "Die Anfrage wird nach 365 Tagen automatisch gelöscht. "
+            "Bitte innerhalb einer Woche antworten."
+        )
+        kontext = ssl.create_default_context()
+        if settings.SMTP_PORT == 465:
+            verbindung = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10, context=kontext)
+        else:
+            verbindung = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+        with verbindung as s:
+            if settings.SMTP_PORT != 465:
+                s.starttls(context=kontext)
             if settings.SMTP_USER:
                 s.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             s.send_message(msg)

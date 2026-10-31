@@ -26,7 +26,7 @@ export default function ActionItems({ items }: Props) {
     return (
       <div className="p-6 rounded-xl bg-bg-secondary/50 text-center">
         <p className="font-body text-sm text-neutral/50">
-          Keine Handlungsfelder — ergonomische Situation zufriedenstellend.
+          Keine Handlungsfelder erkannt.
         </p>
       </div>
     )
@@ -63,15 +63,6 @@ export default function ActionItems({ items }: Props) {
               {item.text}
             </p>
 
-            {/* Reduction potential */}
-            {item.reduction_pct != null && (
-              <div className="flex-shrink-0 flex flex-col items-end justify-center">
-                <span className="font-mono text-xs text-neutral/40">Potenzial</span>
-                <span className="font-mono text-base font-bold text-[#22c55e]">
-                  −{item.reduction_pct} %
-                </span>
-              </div>
-            )}
           </div>
         )
       })}

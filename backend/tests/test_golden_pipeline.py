@@ -1,13 +1,17 @@
 """Golden test (S1): result.json of the analysis pipeline must not change.
 
 The reference was created at the fix commit 8b4de53 (movement rules, trunk
-angle in pixels, duration from the video), before the pose recorder existed. The pipeline
+angle in pixels, duration from the video), before the pose recorder existed,
+and set anew on 31.10.2026 on purpose: neck, upper arm and lower arm angles as
+in the REBA definition, no reduction percentages, reba_max and
+erkennung_anteil added, body height removed. The pipeline
 runs on a synthetic video with a scripted landmarker, so the test needs no
 model and no customer video.
 
 Optional: MOTAVI_GOLDEN_VIDEO=/path/to/testvideo.mp4 additionally runs the
 real MediaPipe model on the test video and compares with
-golden/testvideo_result.json.
+golden/testvideo_result.json. That reference predates 31.10.2026 and must be
+created anew with the test video before it is used again.
 """
 import json
 import os

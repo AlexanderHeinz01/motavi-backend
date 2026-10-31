@@ -12,6 +12,22 @@ def raw_video_path(job_id: str) -> str:
     return f"{settings.RAW_PREFIX}{job_id}/video.mp4"
 
 
+def create_upload_session(path: str, content_type: str, size: int, origin: Optional[str]) -> str:
+    """Resumable upload session for *path*; the browser sends the file to the
+    returned URL directly (Cloud Run allows at most 32 MiB per request).
+    origin: the page that uploads; Cloud Storage answers CORS for it."""
+    blob = get_bucket().blob(path)
+    return blob.create_resumable_upload_session(content_type=content_type, size=size, origin=origin)
+
+
+def download_to_file(path: str, dest: str) -> None:
+    """Download a blob into a local file. Raises FileNotFoundError if absent."""
+    blob = get_bucket().blob(path)
+    if not blob.exists():
+        raise FileNotFoundError(f"GCS blob not found: {path}")
+    blob.download_to_filename(dest)
+
+
 def upload_video(job_id: str, data: bytes, content_type: str = "video/mp4") -> str:
     """Upload raw video bytes. Returns the GCS blob path."""
     path = raw_video_path(job_id)

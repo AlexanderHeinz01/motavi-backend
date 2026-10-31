@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { uploadVideoWithProgress, type UploadMeta } from '../api/motavi'
+import { SCHICHT, uploadVideo, type Arbeitsplatz } from '../api/motavi'
 import { useAuth } from '../auth/AuthContext'
+import UploadLinkErstellen from '../components/UploadLinkErstellen'
 import UploadZone from '../components/UploadZone'
 
 type Phase = 'idle' | 'selected' | 'uploading' | 'error'
@@ -13,14 +14,14 @@ const inputCls =
 
 export default function UploadPage() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, token, logout } = useAuth()
   const [file,     setFile]     = useState<File | null>(null)
   const [phase,    setPhase]    = useState<Phase>('idle')
   const [progress, setProgress] = useState(0)
   const [error,    setError]    = useState<string | null>(null)
-  const [meta,     setMeta]     = useState<UploadMeta>({ shift_duration_min: 480 })
+  const [meta,     setMeta]     = useState<Arbeitsplatz>({ schichtdauer_min: SCHICHT.standard })
 
-  const setField = <K extends keyof UploadMeta>(k: K, v: UploadMeta[K]) =>
+  const setField = <K extends keyof Arbeitsplatz>(k: K, v: Arbeitsplatz[K]) =>
     setMeta(m => ({ ...m, [k]: v }))
 
   const handleFile = (f: File) => {
@@ -30,12 +31,12 @@ export default function UploadPage() {
   }
 
   const handleUpload = async () => {
-    if (!file) return
+    if (!file || !token) return
     setPhase('uploading')
     setError(null)
     setProgress(0)
     try {
-      const { job_id } = await uploadVideoWithProgress(file, setProgress, meta)
+      const { job_id } = await uploadVideo(file, meta, token, setProgress)
       navigate(`/app/analyzing/${job_id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload fehlgeschlagen.')
@@ -74,7 +75,7 @@ export default function UploadPage() {
             MOTAVI
           </h1>
           <p className="font-body text-base text-neutral/50">
-            KI-gestützte Ergonomie-Analyse für produzierende Unternehmen
+            Internes Werkzeug: Videos analysieren, Steckbriefe prüfen
           </p>
         </div>
 
@@ -114,35 +115,22 @@ export default function UploadPage() {
               <textarea
                 value={meta.task_description ?? ''}
                 onChange={e => setField('task_description', e.target.value || undefined)}
-                placeholder='optional — z. B. „Montage Karosserie, stehend"'
+                placeholder='optional, z. B. „Montage Karosserie, stehend“'
                 rows={2}
                 disabled={uploading}
                 className={`${inputCls} resize-none`}
               />
             </label>
-            <label className="flex flex-col gap-1.5">
+            <label className="col-span-2 flex flex-col gap-1.5">
               <span className="font-body text-xs text-neutral/50">
-                Schichtdauer (Min)<span className="text-accent ml-0.5">*</span>
+                Netto-Arbeitszeit je Schicht in Minuten, ohne Pausen<span className="text-accent ml-0.5">*</span>
               </span>
               <input
                 type="number"
-                value={meta.shift_duration_min}
-                onChange={e => setField('shift_duration_min', Math.max(1, Number(e.target.value) || 480))}
-                min={1}
-                max={720}
-                disabled={uploading}
-                className={inputCls}
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="font-body text-xs text-neutral/50">Körpergröße (cm)</span>
-              <input
-                type="number"
-                value={meta.worker_height_cm ?? ''}
-                onChange={e => setField('worker_height_cm', e.target.value ? Number(e.target.value) : undefined)}
-                placeholder="optional"
-                min={100}
-                max={220}
+                value={meta.schichtdauer_min}
+                onChange={e => setField('schichtdauer_min', Math.min(SCHICHT.max, Math.max(SCHICHT.min, Number(e.target.value) || SCHICHT.standard)))}
+                min={SCHICHT.min}
+                max={SCHICHT.max}
                 disabled={uploading}
                 className={inputCls}
               />
@@ -209,13 +197,16 @@ export default function UploadPage() {
             className="w-full py-3.5 rounded-xl font-headline font-semibold text-base
               bg-accent hover:bg-accent/90 text-white transition-colors duration-150"
           >
-            Analyse starten →
+            Analyse starten
           </button>
         )}
 
+        {/* Upload links for customers: team only */}
+        {user && ['berater', 'admin'].includes(user.role) && token && <UploadLinkErstellen token={token} />}
+
         {/* Footer note */}
         <p className="text-center font-body text-xs text-neutral/25">
-          Anonymisierung auf dem Server · Server in Deutschland (Frankfurt)
+          Analyse auf Servern in Deutschland (Frankfurt) · Originalvideo wird nach der Auswertung gelöscht
         </p>
       </div>
     </div>

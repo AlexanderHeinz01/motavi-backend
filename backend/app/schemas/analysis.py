@@ -41,23 +41,24 @@ class CriticalFrame(BaseModel):
     reba: float
     movement: str
     gcs_path: str
+    # short-lived address for the dashboard (routers/analysis.py)
+    bild_url: Optional[str] = None
 
 
 class ActionItem(BaseModel):
     priority: str  # "CRITICAL" | "MEDIUM"
     region: str
     text: str
-    reduction_pct: Optional[int] = None
 
 
 class AnalysisResult(BaseModel):
     job_id: str
-    worker_id: Optional[str] = None
     company_name: Optional[str] = None
     department: Optional[str] = None
     task_description: Optional[str] = None
-    worker_height_cm: Optional[int] = None
     shift_duration_min: int
+    # share of the sampled frames with a detected person (from 31.10.2026)
+    erkennung_anteil: Optional[float] = None
     reba_score: float
     reba_level: str  # "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH"
     body_regions: BodyRegions

@@ -58,7 +58,7 @@ export default function LoginPage() {
       <div style={{ background: '#111111', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 48, position: 'relative', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(108,58,237,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(108,58,237,0.1) 1px, transparent 1px)', backgroundSize: '50px 50px' }} />
         <div style={{ position: 'absolute', top: '30%', left: '20%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(108,58,237,0.2) 0%, transparent 70%)' }} />
-        <Link to="/" style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+        <Link to="/login" style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
           <MotaviMark />
           <span style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 700, fontSize: 20, color: '#fff', letterSpacing: '-0.3px' }}>motavi</span>
         </Link>
@@ -69,9 +69,9 @@ export default function LoginPage() {
             <div style={{ width: 4, height: 3, background: 'rgba(108,58,237,0.15)', borderRadius: 2 }} />
           </div>
           <p style={{ fontFamily: 'Outfit,sans-serif', fontSize: 22, fontWeight: 600, color: '#fff', lineHeight: 1.5, letterSpacing: '-0.3px', marginBottom: 16 }}>
-            "Ergonomieanalysen in Stunden statt Wochen – kamerabasiert, KI-gestützt, datenschutzkonform."
+            Internes Werkzeug für Analyse, Expertenbewertung und Steckbrief.
           </p>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>● KI-gestützte Ergonomieanalyse für Produktion und Logistik</span>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>● Nur für das Motavi-Team</span>
         </div>
       </div>
 

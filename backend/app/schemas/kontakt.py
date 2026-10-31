@@ -4,8 +4,12 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-# Pragmatic check: something@domain.tld, no spaces (no extra dependency)
-_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]{2,}$")
+# Pragmatic check: local@domain.tld with the usual characters only, so that no
+# list of addresses or display name passes (no extra dependency)
+_EMAIL = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$")
+# Control characters; single-line fields allow none, the message tab and line breaks
+_STEUER = re.compile(r"[\x00-\x1f\x7f]")
+_STEUER_TEXT = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
 class KontaktAnfrage(BaseModel):
@@ -22,6 +26,20 @@ class KontaktAnfrage(BaseModel):
     nachricht: Optional[str] = Field(default=None, max_length=4000)
     # Honeypot: hidden field, people leave it empty
     website: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("name", "unternehmen", "funktion", "telefon", "website")
+    @classmethod
+    def _einzeilig(cls, v: Optional[str]) -> Optional[str]:
+        if v and _STEUER.search(v):
+            raise ValueError("Bitte ohne Zeilenumbrüche und Steuerzeichen.")
+        return v
+
+    @field_validator("nachricht")
+    @classmethod
+    def _text(cls, v: Optional[str]) -> Optional[str]:
+        if v and _STEUER_TEXT.search(v):
+            raise ValueError("Bitte ohne Steuerzeichen.")
+        return v
 
     @field_validator("email")
     @classmethod

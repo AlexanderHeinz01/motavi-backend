@@ -2,25 +2,16 @@
  "action_items": [
   {
    "priority": "CRITICAL",
-   "reduction_pct": 50,
    "region": "Schulter",
    "text": "Überkopfarbeit: 22 % der Schichtzeit. Arbeitsmittel in Greifhöhe bringen."
   },
   {
    "priority": "MEDIUM",
-   "reduction_pct": 20,
    "region": "Lendenwirbel",
    "text": "Moderate Lendenbelastung. Regelmäßige Entlastungspausen empfohlen."
   },
   {
    "priority": "MEDIUM",
-   "reduction_pct": 15,
-   "region": "Nacken",
-   "text": "Nackenhaltung auffällig. Arbeitsoberfläche um 5–10 cm anheben."
-  },
-  {
-   "priority": "MEDIUM",
-   "reduction_pct": 25,
    "region": "Unterarm",
    "text": "Ungünstige Unterarmhaltung erkannt. Stützvorrichtungen prüfen."
   }
@@ -36,35 +27,36 @@
   "knee_l": 0.9499999999999998,
   "knee_r": 1.0,
   "lumbar": 3.5,
-  "neck": 3.888888888888889,
-  "shoulder_l": 7.199999999999999,
-  "shoulder_r": 8.0
+  "neck": 1.6666666666666667,
+  "shoulder_l": 3.4000000000000004,
+  "shoulder_r": 3.7777777777777777
  },
  "company_name": null,
  "critical_frames": [
   {
    "gcs_path": "results/golden/frames/critical_1.jpg",
-   "movement": "bending",
+   "movement": "overhead",
    "rank": 1,
-   "reba": 7.63,
-   "second": 1.0
+   "reba": 6.11,
+   "second": 6.0
   },
   {
    "gcs_path": "results/golden/frames/critical_2.jpg",
-   "movement": "bending",
+   "movement": "overhead",
    "rank": 2,
-   "reba": 7.63,
-   "second": 3.0
+   "reba": 5.15,
+   "second": 7.0
   },
   {
    "gcs_path": "results/golden/frames/critical_3.jpg",
-   "movement": "overhead",
+   "movement": "bending",
    "rank": 3,
-   "reba": 7.63,
-   "second": 6.0
+   "reba": 4.99,
+   "second": 1.0
   }
  ],
  "department": null,
+ "erkennung_anteil": 0.9,
  "job_id": "golden",
  "movements": {
   "bending": {
@@ -80,14 +72,15 @@
    "pct": 22.2
   }
  },
- "reba_level": "HIGH",
- "reba_score": 6.23,
+ "reba_level": "MEDIUM",
+ "reba_max": 6.11,
+ "reba_score": 4.67,
  "shift_duration_min": 1,
  "task_description": null,
  "timeline": [
   {
    "minute": 0,
-   "reba": 6.23
+   "reba": 4.67
   }
  ],
  "timeline_frames": [
@@ -127,6 +120,5 @@
    "movement": "neutral",
    "second": 9.0
   }
- ],
- "worker_height_cm": null
+ ]
 }

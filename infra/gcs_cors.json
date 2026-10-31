@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://APP_DOMAIN"],
+    "method": ["PUT", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Content-Range", "Range"],
+    "maxAgeSeconds": 3600
+  }
+]

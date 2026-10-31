@@ -3,11 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAnalysis } from '../hooks/useAnalysis'
 
 const STEPS = [
-  'Anonymisierung läuft…',
-  'Pose-Landmarks werden berechnet…',
-  'REBA-Subscores werden ermittelt…',
-  'Bewegungsklassifikation läuft…',
-  'Bericht wird zusammengestellt…',
+  'Gelenkpunkte werden berechnet …',
+  'Haltungsindex wird ermittelt …',
+  'Bewegungsklassifikation läuft …',
+  'Kritische Momente werden geschwärzt …',
+  'Bericht wird zusammengestellt …',
 ]
 
 function SkeletonBlock({ className }: { className?: string }) {
@@ -81,7 +81,7 @@ export default function AnalyzingPage() {
 
         {/* Footer */}
         <p className="text-center font-body text-xs text-neutral/20">
-          Die Analyse läuft serverseitig — diese Seite kann offen bleiben.
+          Die Analyse läuft auf dem Server. Diese Seite kann offen bleiben.
         </p>
       </div>
 

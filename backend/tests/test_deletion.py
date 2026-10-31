@@ -22,7 +22,9 @@ def test_raw_deleted_after_success_and_media_under_results():
     result, store = golden_run.run(analyzer, gcs, PoseRecorder(), full=True)
     assert "error" not in result
     assert golden_run.deleted == ["raw/golden/video.mp4"]
-    assert "results/golden/video_anon.mp4" in store
+    # no video is kept (31.10.2026), only frames with blacked-out heads and pose data
+    assert not any(k.endswith(".mp4") for k in store)
+    assert "results/golden/frames/critical_1.jpg" in store
     assert "results/golden/pose.npz" in store
     assert not any(k.startswith("uploads/") for k in store)
 

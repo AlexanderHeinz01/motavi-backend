@@ -12,9 +12,10 @@ def get_gcs_client() -> storage.Client:
     """Return a cached GCS client.
 
     Two auth paths:
-    - Cloud Run: GCP_SERVICE_ACCOUNT_KEY contains the SA key as a JSON string
-      (injected via Secret Manager).
-    - Local dev: uses GOOGLE_APPLICATION_CREDENTIALS file path or ADC.
+    - Cloud Run: the attached service account (Application Default
+      Credentials, docs/BETRIEB.md); no key needed.
+    - Optional: GCP_SERVICE_ACCOUNT_KEY with a key as JSON string, or locally
+      GOOGLE_APPLICATION_CREDENTIALS.
     """
     if settings.GCP_SERVICE_ACCOUNT_KEY:
         sa_info = json.loads(settings.GCP_SERVICE_ACCOUNT_KEY)
