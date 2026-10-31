@@ -76,3 +76,32 @@ def test_no_unchecked_legal_claim(monkeypatch):
     monkeypatch.setattr(rl_config, "pageCompression", 0)
     data = pdf.generate_report_pdf(RESULT)
     assert b"DSGVO" not in data and b"Analyse auf Servern in Deutschland" in data  # parentheses are escaped in the PDF
+
+
+def test_report_with_cycle_and_reach_still_four_pages(monkeypatch):
+    """Decision P1 (31.10.2026): the Video-Check delivers cycle time and reach
+    in the ergonomics report."""
+    monkeypatch.setattr(rl_config, "pageCompression", 0)
+    ablauf = {
+        "zykluszeit_s": 38.4, "zyklen_pro_schicht": 690, "hinweis": None, "griffe_ausserhalb": 0.21,
+        "hoehenzonen": {"unter_knie": 0.08, "knie_huefte": 0.29, "huefte_schulter": 0.56, "ueber_schulter": None},
+        "zonen_text": {"unter_knie": "unter Knie", "knie_huefte": "Knie bis Hüfte", "huefte_schulter": "Hüfte bis Schulter", "ueber_schulter": "über Schulter"},
+    }
+    data = pdf.generate_report_pdf(RESULT, ablauf)
+    assert len(re.findall(rb"/Type /Page[^s]", data)) == 4
+    assert b"(38,4 s)" in data and b"(21 %)" in data and b"nicht belastbar messbar" in data
+
+
+def test_report_route_uses_pose_data_when_present():
+    from unittest.mock import patch
+
+    from backend.app.routers import report
+    from backend.tests.workcycle import prepared_work
+
+    with patch.object(report.gcs, "download_bytes", return_value=b"npz"), \
+         patch.object(report, "load_npz", side_effect=lambda b: b), \
+         patch.object(report, "prepare", return_value=prepared_work()):
+        k = report.ablauf_kennzahlen("job", 450)
+    assert k["zykluszeit_s"] == pytest.approx(10.0, rel=0.05) and k["griffe_ausserhalb"] is not None
+    with patch.object(report.gcs, "download_bytes", side_effect=FileNotFoundError):
+        assert report.ablauf_kennzahlen("job", 450) is None

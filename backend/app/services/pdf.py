@@ -159,8 +159,13 @@ def _table(rows: list[list[str]], widths: list[float], S: dict, extra: list | No
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-def generate_report_pdf(result: dict) -> bytes:
-    """Build the 4-page PDF and return raw bytes."""
+def generate_report_pdf(result: dict, ablauf: dict | None = None) -> bytes:
+    """Build the 4-page PDF and return raw bytes.
+
+    ablauf: cycle time and reach from the pose data (routers/report.py
+    ablauf_kennzahlen), part of every package including the Video-Check
+    (decision P1 on 31.10.2026); None when the pose data are gone.
+    """
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -250,21 +255,43 @@ def generate_report_pdf(result: dict) -> bytes:
         "overhead": "Überkopfarbeit",
         "neutral":  "Schulter neutral",
     }
-    move_rows = [["Bewegungsklasse", "Anteil", "Minuten pro Schicht", "Hochrechnung 8 h"]]
+    move_rows = [["Bewegungsklasse", "Anteil", "Minuten pro Schicht"]]
     for key, label in _move_labels.items():
         mv      = movements.get(key, {})
         pct     = mv.get("pct", 0)
         mins    = mv.get("minutes", 0)
-        extrap  = round(pct / 100 * 480, 0)
-        move_rows.append([label, f"{_de(pct)} %", f"{_de(mins, 0)} min", f"{_de(extrap, 0)} min"])
+        move_rows.append([label, f"{_de(pct)} %", f"{_de(mins, 0)} min"])
 
     cw = _CONTENT_W
-    story.append(_table(move_rows, [cw * 0.38, cw * 0.18, cw * 0.22, cw * 0.22], S))
+    story.append(_table(move_rows, [cw * 0.5, cw * 0.2, cw * 0.3], S))
     story.append(Spacer(1, 0.4 * cm))
     story.append(Paragraph(
-        f"Hochrechnung auf eine 8-Stunden-Schicht. Analysierte Dauer: {shift_min} Minuten.",
+        f"Minuten hochgerechnet auf die Netto-Arbeitszeit je Schicht: {shift_min} Minuten.",
         S["note"],
     ))
+
+    if ablauf:
+        story.append(Spacer(1, 0.6 * cm))
+        story.append(Paragraph("Arbeitsablauf und Greifraum", S["section"]))
+        story.append(Spacer(1, 0.2 * cm))
+
+        def wert(v, fmt) -> str:
+            return fmt(v) if v is not None else "nicht belastbar messbar"
+
+        rows = [["Kennzahl", "Wert"],
+                ["Zykluszeit (Median)", wert(ablauf.get("zykluszeit_s"), lambda v: f"{_de(v)} s")],
+                ["Zyklen pro Schicht", wert(ablauf.get("zyklen_pro_schicht"), lambda v: _de(v, 0))],
+                ["Griffe außerhalb des günstigen Greifraums", wert(ablauf.get("griffe_ausserhalb"), lambda v: f"{_de(v * 100, 0)} %")]]
+        for name, text in ablauf.get("zonen_text", {}).items():
+            rows.append([f"Handposition {text}", wert(ablauf.get("hoehenzonen", {}).get(name), lambda v: f"{_de(v * 100, 0)} %")])
+        story.append(_table(rows, [cw * 0.62, cw * 0.38], S))
+        story.append(Spacer(1, 0.3 * cm))
+        story.append(Paragraph(
+            "Pilotphase: automatisch gemessen, noch nicht gegen manuelle Messungen geprüft. "
+            "Greifraum und Höhen sind relative Werte aus dem 2D-Video, bezogen auf die Körpermaße."
+            + (f" {ablauf['hinweis']}" if ablauf.get("hinweis") else ""),
+            S["note"],
+        ))
 
     story.append(PageBreak())
 

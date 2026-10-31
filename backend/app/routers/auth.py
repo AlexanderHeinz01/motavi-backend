@@ -38,7 +38,7 @@ def _require_config() -> None:
         )
 
 
-async def get_current_user(
+def get_current_user(
     cred: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> dict:
     _require_config()
@@ -66,14 +66,14 @@ async def get_current_user(
 BERATER_ROLES = auth_svc.BERATER_ROLES
 
 
-async def require_berater(user: dict = Depends(get_current_user)) -> dict:
+def require_berater(user: dict = Depends(get_current_user)) -> dict:
     """Signed-in consultant; everyone else gets 403."""
     if user.get("role") not in BERATER_ROLES:
         raise HTTPException(status_code=403, detail="Nur für angemeldete Berater.")
     return user
 
 
-async def require_job(job_id: str, user: dict = Depends(get_current_user)) -> dict:
+def require_job(job_id: str, user: dict = Depends(get_current_user)) -> dict:
     """Signed-in user who may see this job (services/jobs.py); 404 otherwise,
     so that foreign job ids are not confirmed."""
     if not jobs_svc.gueltige_id(job_id):
@@ -87,7 +87,7 @@ async def require_job(job_id: str, user: dict = Depends(get_current_user)) -> di
     return user
 
 
-async def require_berater_job(job_id: str, user: dict = Depends(require_berater)) -> dict:
+def require_berater_job(job_id: str, user: dict = Depends(require_berater)) -> dict:
     """Consultant and a well-formed job id (the team sees every job)."""
     if not jobs_svc.gueltige_id(job_id):
         raise HTTPException(status_code=404, detail="Job nicht gefunden.")
@@ -112,12 +112,12 @@ def login(body: LoginRequest, request: Request) -> TokenResponse:
 
 
 @router.get("/auth/me", response_model=UserPublic)
-async def me(user: dict = Depends(get_current_user)) -> UserPublic:
+def me(user: dict = Depends(get_current_user)) -> UserPublic:
     return _to_public(user)
 
 
 @router.post("/auth/register", response_model=UserPublic, status_code=201)
-async def register(
+def register(
     body: RegisterRequest,
     x_setup_key: Optional[str] = Header(default=None),
 ) -> UserPublic:
