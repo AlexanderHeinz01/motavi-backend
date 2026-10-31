@@ -273,7 +273,7 @@ def _seite1(doc: dict, st: dict) -> list:
         ),
         Spacer(1, 6),
         Paragraph(
-            "Pilotphase: Zyklen, Ablaufschritte, Greifraum und Drehung sind noch nicht gegen manuelle Messungen validiert. "
+            "Pilotphase: Zyklen, Ablaufschritte, Greifraum, Drehung und REBA sind noch nicht gegen manuelle Messungen und Bewertungen validiert. "
             "„nicht belastbar messbar“ steht, wo die Messqualität unter der Schwelle liegt.",
             st["klein"],
         ),

@@ -221,7 +221,8 @@ def generate_report_pdf(result: dict) -> bytes:
             Paragraph(f"{stufe}: {massnahme}", level_style),
             Spacer(1, 8),
             Paragraph("REBA (Rapid Entire Body Assessment) bewertet die Körperhaltung von 1 bis 15. "
-                      "Stufen: 1 vernachlässigbar, 2 bis 3 niedrig, 4 bis 7 mittel, 8 bis 10 hoch, ab 11 sehr hoch.", S["note"]),
+                      "Stufen: 1 vernachlässigbar, 2 bis 3 niedrig, 4 bis 7 mittel, 8 bis 10 hoch, ab 11 sehr hoch. "
+                      "Pilotphase: Die Berechnung aus dem Video ist noch nicht gegen manuelle REBA-Bewertungen geprüft.", S["note"]),
         ]]],
         colWidths=[_CONTENT_W],
     )
