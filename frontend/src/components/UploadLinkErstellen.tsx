@@ -51,8 +51,7 @@ export default function UploadLinkErstellen({ token }: { token: string }) {
         <div className="flex flex-col gap-1">
           <input readOnly className={`${inputCls} font-mono text-xs`} value={absolut} onFocus={(e) => e.target.select()} />
           <p className="font-body text-xs text-neutral/40">
-            Gültig bis {new Date(link.gueltig_bis).toLocaleDateString('de-DE')}, für ein Video. Danach erscheint der Job in der Übersicht unter
-            /app/dashboard/{link.job_id}.
+            Gültig bis {new Date(link.gueltig_bis).toLocaleDateString('de-DE')}, für ein Video. Den Stand sehen Sie im Dashboard.
           </p>
         </div>
       )}

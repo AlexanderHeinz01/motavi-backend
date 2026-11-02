@@ -7,6 +7,10 @@
 #   _SECRETS         complete list of secrets; --set-secrets replaces all
 #                    existing ones, so everything the service needs is listed
 #   _SMTP_HOST, _SMTP_FROM, _CONTACT_NOTIFY_TO  e-mail notification (optional)
+#   _FIREBASE_PROJECT_ID, _FIREBASE_API_KEY, _FIREBASE_AUTH_DOMAIN, _FIREBASE_APP_ID
+#                    web configuration of the Firebase project (sign-in, required)
+#   _FIREBASE_PROVIDERS  sign-in options: password, google, microsoft (separated by ",")
+#   _ADMIN_EMAILS    always admin, to grant the first accesses (separated by ",")
 substitutions:
   _PUBLIC_APP_URL: ''
   _CORS_ORIGINS: ''
@@ -14,6 +18,12 @@ substitutions:
   _SMTP_HOST: ''
   _SMTP_FROM: ''
   _CONTACT_NOTIFY_TO: ''
+  _FIREBASE_PROJECT_ID: ''
+  _FIREBASE_API_KEY: ''
+  _FIREBASE_AUTH_DOMAIN: ''
+  _FIREBASE_APP_ID: ''
+  _FIREBASE_PROVIDERS: 'password,google'
+  _ADMIN_EMAILS: ''
 
 steps:
   - name: 'gcr.io/cloud-builders/docker'
@@ -54,7 +64,7 @@ steps:
       # cost ceiling
       - --max-instances=3
       - --set-secrets=${_SECRETS}
-      - --update-env-vars=^;^APP_ENV=production;PUBLIC_APP_URL=${_PUBLIC_APP_URL};CORS_ORIGINS=${_CORS_ORIGINS};SMTP_HOST=${_SMTP_HOST};SMTP_FROM=${_SMTP_FROM};CONTACT_NOTIFY_TO=${_CONTACT_NOTIFY_TO}
+      - --update-env-vars=^;^APP_ENV=production;PUBLIC_APP_URL=${_PUBLIC_APP_URL};CORS_ORIGINS=${_CORS_ORIGINS};SMTP_HOST=${_SMTP_HOST};SMTP_FROM=${_SMTP_FROM};CONTACT_NOTIFY_TO=${_CONTACT_NOTIFY_TO};FIREBASE_PROJECT_ID=${_FIREBASE_PROJECT_ID};FIREBASE_API_KEY=${_FIREBASE_API_KEY};FIREBASE_AUTH_DOMAIN=${_FIREBASE_AUTH_DOMAIN};FIREBASE_APP_ID=${_FIREBASE_APP_ID};FIREBASE_PROVIDERS=${_FIREBASE_PROVIDERS};ADMIN_EMAILS=${_ADMIN_EMAILS}
 
 images:
   - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA

@@ -74,6 +74,17 @@ def put_json(path: str, data: dict) -> None:
     _upload(path, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json")
 
 
+def list_json(glob: str, limit: int = 2000) -> list[dict]:
+    """Parsed JSON blobs whose names match *glob* (e.g. results/*/job.json)."""
+    out = []
+    for blob in get_bucket().list_blobs(match_glob=glob, max_results=limit):
+        try:
+            out.append(json.loads(blob.download_as_bytes()))
+        except Exception:
+            continue
+    return out
+
+
 def blob_exists(path: str) -> bool:
     """Return True if the GCS blob exists."""
     return get_bucket().blob(path).exists()

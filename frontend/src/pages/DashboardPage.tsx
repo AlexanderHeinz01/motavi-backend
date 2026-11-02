@@ -73,9 +73,9 @@ export default function DashboardPage() {
       <header className="border-b border-bg-secondary px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/app')}
+            onClick={() => navigate('/app/jobs')}
             className="text-neutral/30 hover:text-neutral/70 transition-colors"
-            aria-label="Zurück"
+            aria-label="Zurück zum Dashboard"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />

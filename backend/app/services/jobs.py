@@ -22,6 +22,8 @@ _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 # status values
 WARTET = "wartet_auf_upload"
 LAEUFT = "processing"
+FERTIG = "fertig"
+FEHLER = "fehler"
 
 
 def gueltige_id(job_id: str) -> bool:
@@ -59,3 +61,19 @@ def darf_zugreifen(job: Optional[dict], user: dict) -> bool:
     if user.get("role") in BERATER_ROLES:
         return True
     return bool(job) and job.get("erstellt_von") == user.get("email")
+
+
+def status_setzen(job_id: str, status: str) -> None:
+    """After the analysis (analyzer.py); jobs from before job.json existed have none."""
+    job = laden(job_id)
+    if job:
+        job["status"] = status
+        job["beendet_am"] = datetime.now(timezone.utc).isoformat()
+        speichern(job)
+
+
+def liste(user: dict) -> list[dict]:
+    """Jobs the user may see, newest first (page Dashboard of the internal tool)."""
+    alle = gcs.list_json(f"{settings.RESULTS_PREFIX}*/job.json")
+    sichtbar = [j for j in alle if darf_zugreifen(j, user)]
+    return sorted(sichtbar, key=lambda j: j.get("erstellt_am", ""), reverse=True)

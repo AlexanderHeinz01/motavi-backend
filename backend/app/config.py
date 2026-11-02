@@ -45,8 +45,22 @@ class Settings(BaseSettings):
     # Metric "arms above shoulder height": upper arm angle to the trunk
     ARM_ELEVATION_DEG: float = 90.0
 
+    # ── Sign-in with Firebase Authentication (services/firebase_auth.py) ────
+    # Project id; set: the API accepts Firebase ID tokens only. Empty: the
+    # former password sign-in (development, tests).
+    FIREBASE_PROJECT_ID: str = ""
+    # Public web configuration for the sign-in page (not secret)
+    FIREBASE_API_KEY: str = ""
+    FIREBASE_AUTH_DOMAIN: str = ""
+    FIREBASE_APP_ID: str = ""
+    # Sign-in options on the page, separated by ",": password, google, microsoft
+    FIREBASE_PROVIDERS: str = "password,google"
+    # Always admin, to grant the first accesses; separated by ","
+    ADMIN_EMAILS: str = ""
+
     # ── Auth (JWT) ──────────────────────────────────────────────────────────
-    # HMAC secret for signing access tokens (inject via Secret Manager).
+    # HMAC secret for signing upload links, frame links and (without
+    # Firebase) access tokens (inject via Secret Manager).
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60 * 24  # 24 hours

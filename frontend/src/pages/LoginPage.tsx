@@ -1,140 +1,106 @@
-import { useState, type CSSProperties, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useState, type FormEvent } from 'react'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
-const inputStyle: CSSProperties = {
-  width: '100%', border: '1px solid #E5E7EB', borderRadius: 8, padding: '12px 14px',
-  fontSize: 15, fontFamily: 'Inter,sans-serif', color: '#1A1A1A', background: '#fff',
-  outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
-}
+const inputCls =
+  'w-full px-3 py-2.5 rounded-lg bg-bg-primary border border-bg-secondary focus:outline-none ' +
+  'focus:border-data/50 font-body text-sm text-white placeholder:text-neutral/30'
+const knopfCls =
+  'w-full py-3 rounded-xl font-body text-sm border border-neutral/20 text-white hover:border-data/60 transition-colors'
 
-function MotaviMark() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-      <rect width="32" height="32" rx="6" fill="#6C3AED" />
-      <path d="M8 23L12 9l4 10 4-10 4 14" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    </svg>
-  )
-}
-
+/** Sign-in of the internal tool: options from the backend (Firebase or the former password sign-in). */
 export default function LoginPage() {
-  const { login } = useAuth()
-  const navigate = useNavigate()
+  const { user, loading, anbieter, hinweis, loginPasswort, loginGoogle, loginMicrosoft, passwortVergessen, erneutPruefen, logout } = useAuth()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/app'
-
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPw, setShowPw] = useState(false)
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle')
-  const [error, setError] = useState<string | null>(null)
+  const [passwort, setPasswort] = useState('')
+  const [fehler, setFehler] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setStatus('loading')
+  const ziel = (location.state as { from?: { pathname: string } } | null)?.from?.pathname || '/app/jobs'
+  if (!loading && user) return <Navigate to={ziel} replace />
+
+  const ausfuehren = async (f: () => Promise<void>) => {
+    setFehler(null)
+    setInfo(null)
+    setBusy(true)
     try {
-      await login(email, password)
-      setStatus('success')
-      setTimeout(() => navigate(from, { replace: true }), 500)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Anmeldung fehlgeschlagen.')
-      setStatus('idle')
+      await f()
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
     }
   }
 
-  const focusBrand = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = '#6C3AED'
-    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(108,58,237,0.12)'
-  }
-  const blurBrand = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = '#E5E7EB'
-    e.currentTarget.style.boxShadow = 'none'
+  const mitPasswort = anbieter.includes('password') || anbieter.includes('passwort_alt')
+  const senden = (e: FormEvent) => {
+    e.preventDefault()
+    void ausfuehren(() => loginPasswort(email, passwort))
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#fff', fontFamily: 'Inter,sans-serif' }}>
-      {/* Left panel */}
-      <div style={{ background: '#111111', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 48, position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(108,58,237,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(108,58,237,0.1) 1px, transparent 1px)', backgroundSize: '50px 50px' }} />
-        <div style={{ position: 'absolute', top: '30%', left: '20%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(108,58,237,0.2) 0%, transparent 70%)' }} />
-        <Link to="/login" style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <MotaviMark />
-          <span style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 700, fontSize: 20, color: '#fff', letterSpacing: '-0.3px' }}>motavi</span>
-        </Link>
-        <div style={{ position: 'relative', zIndex: 2, marginTop: 'auto', marginBottom: 40 }}>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 3, background: '#6C3AED', borderRadius: 2 }} />
-            <div style={{ width: 8, height: 3, background: 'rgba(108,58,237,0.3)', borderRadius: 2 }} />
-            <div style={{ width: 4, height: 3, background: 'rgba(108,58,237,0.15)', borderRadius: 2 }} />
-          </div>
-          <p style={{ fontFamily: 'Outfit,sans-serif', fontSize: 22, fontWeight: 600, color: '#fff', lineHeight: 1.5, letterSpacing: '-0.3px', marginBottom: 16 }}>
-            Internes Werkzeug für Analyse, Expertenbewertung und Steckbrief.
-          </p>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>● Nur für das Motavi-Team</span>
+    <div className="min-h-screen bg-bg-primary flex items-center justify-center px-6 py-12">
+      <div className="w-full max-w-sm flex flex-col gap-5">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-widest text-neutral/40">Motavi</p>
+          <h1 className="font-headline text-3xl font-bold text-white mt-2">Anmelden</h1>
+          <p className="font-body text-sm text-neutral/60 mt-2">Zugang für freigegebene Benutzer: Videos hochladen und Ergebnisse im Dashboard ansehen.</p>
         </div>
-      </div>
 
-      {/* Right panel */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', marginBottom: 56 }}>
-            <MotaviMark />
-            <span style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 700, fontSize: 20, color: '#1A1A1A', letterSpacing: '-0.3px' }}>motavi</span>
-          </Link>
+        {loading && <p className="font-body text-sm text-neutral/50">Lädt …</p>}
 
-          <h1 style={{ fontFamily: 'Outfit,sans-serif', fontSize: 30, fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.5px', marginBottom: 8 }}>Willkommen zurück</h1>
-          <p style={{ fontSize: 15, color: '#6B7280', marginBottom: 40 }}>Melden Sie sich an, um Ihre Analysen aufzurufen.</p>
-
-          {error && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 16 }}>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 20 }}>
-              <label htmlFor="email" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1A1A1A', marginBottom: 6 }}>E-Mail-Adresse</label>
-              <input id="email" type="email" autoComplete="email" placeholder="name@unternehmen.de" value={email}
-                onChange={(e) => setEmail(e.target.value)} onFocus={focusBrand} onBlur={blurBrand} style={inputStyle} />
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <label htmlFor="password" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1A1A1A', marginBottom: 6 }}>Passwort</label>
-              <div style={{ position: 'relative' }}>
-                <input id="password" type={showPw ? 'text' : 'password'} autoComplete="current-password" placeholder="••••••••" value={password}
-                  onChange={(e) => setPassword(e.target.value)} onFocus={focusBrand} onBlur={blurBrand} style={{ ...inputStyle, paddingRight: 44 }} />
-                <button type="button" aria-label="Passwort anzeigen" onClick={() => setShowPw((v) => !v)}
-                  style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex', alignItems: 'center', padding: 0 }}>
-                  {showPw ? (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  ) : (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                  )}
+        {!loading && (
+          <>
+            {anbieter.includes('google') && (
+              <button className={knopfCls} disabled={busy} onClick={() => ausfuehren(loginGoogle)}>Mit Google anmelden</button>
+            )}
+            {anbieter.includes('microsoft') && (
+              <button className={knopfCls} disabled={busy} onClick={() => ausfuehren(loginMicrosoft)}>Mit Microsoft anmelden</button>
+            )}
+            {mitPasswort && (
+              <form onSubmit={senden} className="flex flex-col gap-3">
+                <label className="flex flex-col gap-1.5">
+                  <span className="font-body text-xs text-neutral/50">E-Mail</span>
+                  <input className={inputCls} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="font-body text-xs text-neutral/50">Passwort</span>
+                  <input className={inputCls} type="password" autoComplete="current-password" required value={passwort} onChange={(e) => setPasswort(e.target.value)} />
+                </label>
+                <button type="submit" disabled={busy} className="w-full py-3 rounded-xl font-headline font-semibold text-base bg-accent hover:bg-accent/90 text-white">
+                  Anmelden
                 </button>
-              </div>
-            </div>
-            <button type="submit" disabled={status !== 'idle'}
-              style={{
-                width: '100%', background: status === 'success' ? '#22c55e' : '#6C3AED', color: '#fff',
-                border: 'none', borderRadius: 8, padding: 14, fontSize: 15, fontWeight: 600,
-                fontFamily: 'Inter,sans-serif', cursor: status === 'idle' ? 'pointer' : 'default',
-                marginTop: 8, transition: 'background 0.2s',
-              }}>
-              {status === 'loading' ? 'Anmelden…' : status === 'success' ? '✓ Weiterleitung…' : 'Anmelden'}
-            </button>
-          </form>
+                {anbieter.includes('password') && (
+                  <button
+                    type="button"
+                    className="font-body text-xs text-neutral/50 underline underline-offset-4 self-start"
+                    onClick={() =>
+                      email
+                        ? ausfuehren(async () => { await passwortVergessen(email); setInfo('Wir haben Ihnen einen Link zum Zurücksetzen geschickt.') })
+                        : setFehler('Bitte zuerst die E-Mail-Adresse eintragen.')
+                    }
+                  >
+                    Passwort vergessen
+                  </button>
+                )}
+              </form>
+            )}
+          </>
+        )}
 
-          <p style={{ textAlign: 'center', marginTop: 24, fontSize: 14, color: '#6B7280' }}>
-            Noch kein Zugang?{' '}
-            <Link to="/#demo" style={{ color: '#6C3AED', textDecoration: 'none', fontWeight: 500 }}>Demo anfragen →</Link>
-          </p>
-        </div>
+        {fehler && <p className="font-body text-sm text-accent" role="alert">{fehler}</p>}
+        {info && <p className="font-body text-sm text-data">{info}</p>}
+        {hinweis && (
+          <div className="rounded-xl border border-bg-secondary p-4 flex flex-col gap-3">
+            <p className="font-body text-sm text-white">{hinweis}</p>
+            <div className="flex gap-4">
+              <button className="font-body text-xs text-data underline underline-offset-4" onClick={() => ausfuehren(erneutPruefen)}>Erneut prüfen</button>
+              <button className="font-body text-xs text-neutral/50 underline underline-offset-4" onClick={logout}>Abmelden</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

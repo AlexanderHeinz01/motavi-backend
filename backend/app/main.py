@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from .config import settings
-from .routers import analysis, auth, kontakt, report, upload, upload_links, workplace
+from .routers import analysis, auth, jobs, kontakt, report, upload, upload_links, workplace, zugaenge
 
 app = FastAPI(title="Motavi API", version="0.3.0")
 
@@ -19,6 +19,8 @@ def pruefe_produktion(cfg=settings) -> None:
         raise RuntimeError("JWT_SECRET fehlt oder ist kürzer als 32 Byte (Secret Manager, docs/BETRIEB.md).")
     if not cfg.PUBLIC_APP_URL.startswith("https://"):
         raise RuntimeError("PUBLIC_APP_URL fehlt (https-Adresse des Dienstes für Upload-Links).")
+    if not getattr(cfg, "FIREBASE_PROJECT_ID", ""):
+        raise RuntimeError("FIREBASE_PROJECT_ID fehlt (Anmeldung über Firebase, docs/BETRIEB.md).")
     if not cfg.CORS_ORIGINS:
         raise RuntimeError("CORS_ORIGINS fehlt (Adresse der Website für das Kontaktformular).")
 
@@ -42,6 +44,8 @@ app.include_router(analysis.router, prefix="/api/v1")
 app.include_router(report.router,   prefix="/api/v1")
 app.include_router(workplace.router, prefix="/api/v1")
 app.include_router(kontakt.router,   prefix="/api/v1")
+app.include_router(jobs.router,      prefix="/api/v1")
+app.include_router(zugaenge.router,  prefix="/api/v1")
 
 
 @app.get("/api/v1/health")

@@ -350,13 +350,26 @@ async def run_pipeline(job_id: str, meta: dict | None = None, recorder=None) -> 
 
 def _pipeline_sync(job_id: str, meta: dict, recorder=None) -> None:
     logger.info("Pipeline start: %s", job_id)
+    status = "fertig"
     try:
-        _run(job_id, meta, recorder)
+        if not _run(job_id, meta, recorder):
+            status = "fehler"
     except Exception:
         logger.exception("Pipeline failed: %s", job_id)
         _write_error(job_id, "Die Analyse ist fehlgeschlagen. Bitte versuchen Sie es erneut oder wenden Sie sich an uns.")
+        status = "fehler"
     finally:
         _delete_raw(job_id)
+        _job_status(job_id, status)
+
+
+def _job_status(job_id: str, status: str) -> None:
+    """Status in job.json for the overview; a failure here never stops anything."""
+    from . import jobs  # late import: jobs imports auth, which is not needed for the analysis itself
+    try:
+        jobs.status_setzen(job_id, status)
+    except Exception:
+        logger.exception("Updating the job status failed: %s", job_id)
 
 
 def _delete_raw(job_id: str) -> None:
@@ -370,7 +383,8 @@ def _delete_raw(job_id: str) -> None:
         logger.exception("Deleting the raw video failed: %s", job_id)
 
 
-def _run(job_id: str, meta: dict, recorder=None) -> None:
+def _run(job_id: str, meta: dict, recorder=None) -> bool:
+    """True with a result, False with an error result (too little detection)."""
     raw_path = gcs.raw_video_path(job_id)
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -437,7 +451,7 @@ def _run(job_id: str, meta: dict, recorder=None) -> None:
         fehler = _erkennung_fehler(erkennung)
         if fehler:
             _write_error(job_id, fehler)
-            return
+            return False
 
         # Critical frames from the original video while it is still on disk
         critical_frames = _extract_critical_frames(job_id, sampled, input_path)
@@ -456,6 +470,7 @@ def _run(job_id: str, meta: dict, recorder=None) -> None:
         "application/json",
     )
     logger.info("Pipeline done: %s  index=%.1f", job_id, result["reba_score"])
+    return True
 
 
 def _erkennung_fehler(anteil: float) -> str | None:

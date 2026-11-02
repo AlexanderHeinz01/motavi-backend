@@ -6,8 +6,10 @@ import AnalyzingPage from './pages/AnalyzingPage'
 import DashboardPage from './pages/DashboardPage'
 import ExpertPage from './pages/ExpertPage'
 import HochladenPage from './pages/HochladenPage'
+import JobsPage from './pages/JobsPage'
 import LoginPage from './pages/LoginPage'
 import UploadPage from './pages/UploadPage'
+import ZugaengePage from './pages/ZugaengePage'
 
 /** Internal tool of the Motavi team plus the upload page for customers (G2 on 31.10.2026). */
 export default function App() {
@@ -22,6 +24,8 @@ export default function App() {
 
           {/* Protected ergonomics analysis app */}
           <Route path="/app" element={<RequireAuth><UploadPage /></RequireAuth>} />
+          <Route path="/app/jobs" element={<RequireAuth><JobsPage /></RequireAuth>} />
+          <Route path="/app/zugaenge" element={<RequireAuth><ZugaengePage /></RequireAuth>} />
           <Route path="/app/analyzing/:jobId" element={<RequireAuth><AnalyzingPage /></RequireAuth>} />
           <Route path="/app/dashboard/:jobId" element={<RequireAuth><DashboardPage /></RequireAuth>} />
 

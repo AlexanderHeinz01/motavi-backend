@@ -40,3 +40,29 @@ export async function fetchMe(token: string): Promise<UserPublic> {
   if (!res.ok) throw new Error(await parseError(res))
   return res.json()
 }
+
+/** Sign-in configuration from the backend (GET /auth/config). */
+export interface AuthConfig {
+  firebase: { apiKey: string; authDomain: string; projectId: string; appId: string } | null
+  /** password, google, microsoft; "passwort_alt" without Firebase */
+  anbieter: string[]
+}
+
+export async function fetchAuthConfig(): Promise<AuthConfig> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/config`)
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
+export class ApiFehler extends Error {
+  constructor(message: string, public status: number) {
+    super(message)
+  }
+}
+
+/** Like fetchMe, but keeps the status (403: no access). */
+export async function fetchMeStatus(token: string): Promise<UserPublic> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) throw new ApiFehler(await parseError(res), res.status)
+  return res.json()
+}

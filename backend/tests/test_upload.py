@@ -208,9 +208,10 @@ def test_production_refuses_to_start_without_secrets():
     from types import SimpleNamespace
 
     from backend.app.main import pruefe_produktion
-    ok = dict(APP_ENV="production", JWT_SECRET="s" * 32, PUBLIC_APP_URL="https://app.example.de", CORS_ORIGINS="https://www.example.de")
+    ok = dict(APP_ENV="production", JWT_SECRET="s" * 32, PUBLIC_APP_URL="https://app.example.de", CORS_ORIGINS="https://www.example.de",
+              FIREBASE_PROJECT_ID="motavi-test")
     pruefe_produktion(SimpleNamespace(**ok))
     pruefe_produktion(SimpleNamespace(**{**ok, "APP_ENV": "dev", "JWT_SECRET": ""}))
-    for fehler in ({"JWT_SECRET": "kurz"}, {"PUBLIC_APP_URL": ""}, {"CORS_ORIGINS": ""}):
+    for fehler in ({"JWT_SECRET": "kurz"}, {"PUBLIC_APP_URL": ""}, {"CORS_ORIGINS": ""}, {"FIREBASE_PROJECT_ID": ""}):
         with pytest.raises(RuntimeError):
             pruefe_produktion(SimpleNamespace(**{**ok, **fehler}))
