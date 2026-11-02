@@ -30,13 +30,13 @@ steps:
     args:
       - build
       - -t
-      - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA
+      - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$BUILD_ID
       - .
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - push
-      - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA
+      - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$BUILD_ID
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -44,7 +44,7 @@ steps:
       - run
       - deploy
       - motavi-backend
-      - --image=europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA
+      - --image=europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$BUILD_ID
       - --region=europe-west3
       - --platform=managed
       # own service account without key (docs/BETRIEB.md, roles listed there)
@@ -67,7 +67,7 @@ steps:
       - --update-env-vars=^;^APP_ENV=production;PUBLIC_APP_URL=${_PUBLIC_APP_URL};CORS_ORIGINS=${_CORS_ORIGINS};SMTP_HOST=${_SMTP_HOST};SMTP_FROM=${_SMTP_FROM};CONTACT_NOTIFY_TO=${_CONTACT_NOTIFY_TO};FIREBASE_PROJECT_ID=${_FIREBASE_PROJECT_ID};FIREBASE_API_KEY=${_FIREBASE_API_KEY};FIREBASE_AUTH_DOMAIN=${_FIREBASE_AUTH_DOMAIN};FIREBASE_APP_ID=${_FIREBASE_APP_ID};FIREBASE_PROVIDERS=${_FIREBASE_PROVIDERS};ADMIN_EMAILS=${_ADMIN_EMAILS}
 
 images:
-  - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$COMMIT_SHA
+  - europe-west3-docker.pkg.dev/$PROJECT_ID/motavi/backend:$BUILD_ID
 
 # Standard-Build-Maschine reicht nicht für das große Docker-Image (MediaPipe).
 options:

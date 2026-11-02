@@ -12,6 +12,18 @@ Zugriff: Jede Route zu einem Job verlangt die Anmeldung. Das Team (Rollen `berat
 
 ## Einmalige Einrichtung
 
+**Schnellweg:** `infra/einrichten.sh` erledigt die Schritte 1, 2, 4 und 5 und das erste Deployment. Ablauf:
+
+1. Google Cloud Console mit dem Projekt öffnen, oben rechts das Symbol für die Cloud Shell anklicken.
+2. Das Repo holen: `git clone https://github.com/AlexanderHeinz01/motavi-backend.git && cd motavi-backend`. Bei einem privaten Repo fragt GitHub nach Benutzername und Passwort; als Passwort ein Personal Access Token mit Leserecht verwenden.
+3. Ausführen: `ADMIN_EMAIL=ihre@adresse.de bash infra/einrichten.sh`.
+
+Ohne weitere Angaben richtet das Skript im Projekt `motavi-90305` ein. Danach bleiben nur die zwei Schritte in der Firebase-Konsole aus Abschnitt 3a (Anbieter, erlaubte Domain); das Skript nennt die Adresse.
+
+Spätere Deployments starten Sie mit demselben Befehl. Ein Trigger, der bei jedem Push auf `main` baut, ist optional: Cloud Build, Trigger, Trigger erstellen, Repository `motavi-backend` über die GitHub-App verbinden, Ereignis Push auf `main`, Konfiguration `cloudbuild.yaml`, Substitutionen wie in Abschnitt 3.
+
+Die einzelnen Schritte:
+
 ### 1. Dienstkonto ohne Schlüssel
 
 ```
