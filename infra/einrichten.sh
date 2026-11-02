@@ -4,24 +4,28 @@
 #
 #   ADMIN_EMAIL=ihre@adresse.de bash infra/einrichten.sh
 #
-# Optional: PROJECT_ID (Standard motavi-90305), BUCKET, WEBSITE, FIREBASE_PROVIDERS.
+# Optional: PROJECT_ID (Projekt des Backends, Standard motavi-90305), BUCKET,
+# WEBSITE, FIREBASE_PROVIDERS. Die Anmeldung läuft immer über das
+# Firebase-Projekt motavi-90305, auch wenn das Backend in einem anderen Projekt liegt.
 # Das Skript kann mehrfach laufen; vorhandene Teile werden übersprungen.
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:-motavi-90305}"
 REGION="europe-west3"
-BUCKET="${BUCKET:-${PROJECT_ID}-videos}"
+BUCKET="${BUCKET:-}"
 WEBSITE="${WEBSITE:-https://motavi.ai.studio}"
 ADMIN_EMAIL="${ADMIN_EMAIL:?Bitte ADMIN_EMAIL=ihre@adresse.de voranstellen}"
 FIREBASE_PROVIDERS="${FIREBASE_PROVIDERS:-password,google}"
 # Web-Konfiguration aus der Firebase-Konsole (nicht geheim)
+FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID:-motavi-90305}"
 FIREBASE_API_KEY="${FIREBASE_API_KEY:-AIzaSyDY83RpXYo0E3HnLTKNYGmf7MjsHUTiswM}"
-FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN:-${PROJECT_ID}.firebaseapp.com}"
+FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN:-${FIREBASE_PROJECT_ID}.firebaseapp.com}"
 FIREBASE_APP_ID="${FIREBASE_APP_ID:-1:919373958459:web:d3d7d5655f60c33297fb1e}"
 
 schritt() { printf '\n== %s\n' "$*"; }
 
 gcloud config set project "$PROJECT_ID" >/dev/null
+echo "Projekt des Backends: $PROJECT_ID, Anmeldung über Firebase-Projekt: $FIREBASE_PROJECT_ID"
 NUMMER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 SA="motavi-backend@${PROJECT_ID}.iam.gserviceaccount.com"
 URL="https://motavi-backend-${NUMMER}.${REGION}.run.app"
@@ -36,6 +40,12 @@ gcloud artifacts repositories describe motavi --location="$REGION" >/dev/null 2>
   || gcloud artifacts repositories create motavi --repository-format=docker --location="$REGION"
 
 schritt "3/8 Bucket für Videos und Ergebnisse (Frankfurt, ohne Soft Delete und Versionierung)"
+# vorhandenen Bucket aus einer früheren Einrichtung übernehmen
+if [[ -z "$BUCKET" ]] && gcloud secrets describe GCS_BUCKET_NAME >/dev/null 2>&1; then
+  BUCKET="$(gcloud secrets versions access latest --secret=GCS_BUCKET_NAME)"
+fi
+BUCKET="${BUCKET:-${PROJECT_ID}-videos}"
+echo "Bucket: $BUCKET (die Lifecycle-Regeln löschen dort auch alte Originalvideos, docs/LOESCHKONZEPT.md)"
 gcloud storage buckets describe "gs://${BUCKET}" >/dev/null 2>&1 \
   || gcloud storage buckets create "gs://${BUCKET}" --location="$REGION" --uniform-bucket-level-access
 gcloud storage buckets update "gs://${BUCKET}" --clear-soft-delete --no-versioning --lifecycle-file=infra/gcs_lifecycle.json
@@ -77,7 +87,7 @@ done
 
 schritt "8/8 Bauen und veröffentlichen (dauert etwa 10 bis 15 Minuten)"
 gcloud builds submit --config=cloudbuild.yaml \
-  --substitutions="^;^_PUBLIC_APP_URL=${URL};_CORS_ORIGINS=${WEBSITE};_FIREBASE_PROJECT_ID=${PROJECT_ID};_FIREBASE_API_KEY=${FIREBASE_API_KEY};_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN};_FIREBASE_APP_ID=${FIREBASE_APP_ID};_FIREBASE_PROVIDERS=${FIREBASE_PROVIDERS};_ADMIN_EMAILS=${ADMIN_EMAIL}" \
+  --substitutions="^;^_PUBLIC_APP_URL=${URL};_CORS_ORIGINS=${WEBSITE};_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID};_FIREBASE_API_KEY=${FIREBASE_API_KEY};_FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN};_FIREBASE_APP_ID=${FIREBASE_APP_ID};_FIREBASE_PROVIDERS=${FIREBASE_PROVIDERS};_ADMIN_EMAILS=${ADMIN_EMAIL}" \
   .
 
 ECHT="$(gcloud run services describe motavi-backend --region="$REGION" --format='value(status.url)')"
@@ -91,7 +101,7 @@ cat <<FERTIG
 
 Fertig. Adresse des Werkzeugs: ${URL}
 
-Noch von Hand in der Firebase-Konsole (Projekt ${PROJECT_ID}):
+Noch von Hand in der Firebase-Konsole (Projekt ${FIREBASE_PROJECT_ID}):
   1. Authentication > Sign-in method: Anbieter aktivieren (${FIREBASE_PROVIDERS}).
   2. Authentication > Settings > Authorized domains: ${URL#https://} hinzufügen.
 Danach unter ${URL}/login mit ${ADMIN_EMAIL} anmelden.
